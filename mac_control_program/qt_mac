@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""package mac
+author    J. Rutkowski, update by Benoit Dubois (add Linux compatibility)
+copyright FEMTO ST, 2022
+license   GPL v3.0+
+brief     Main script of the MAC controller graphical interface.
+"""
+
+import sys
+import time
+import logging
+import signal
+import argparse
+from serial.tools.list_ports import comports
+import pyqtgraph as pg
+from pyqtgraph.dockarea import *
+from pyqtgraph.Qt import QtGui, QtCore
+import pyqtgraph.parametertree.parameterTypes as pTypes
+from pyqtgraph.parametertree import Parameter, ParameterTree
+##from ui.pyqtgraphaddon import MyFloatParameter
+import mac_device as md
+import misc
+
+
+# ============================================================================
+class SerialReader(pg.QtCore.QThread):
+
+    new_value = pg.QtCore.Signal(str)
+    current_buffer = misc.Buffer(10000)
+    quartzword_buffer = misc.Buffer(10000)
+    error_sig_buffer = misc.Buffer(10000)
+
+    def __init__(self, serial):
+        super().__init__()
+        self.running = False
+        self.serial = serial
+
+    def run(self):
+        #self.serial.connect()
+        self.running = True
+        while self.running:
+            try:
+                line = self.serial.readline().decode('utf-8')
+                if line:
+                    if line[0] == 'D':
+                        line = line[2:-2]
+                    elif line[0] == 'I':
+                        self.current_buffer.append(time.time(),int(line[2:-2]))
+                    elif line[0] == 'Q':
+                        self.quartzword_buffer.append(time.time(),int(line[2:-2]))
+                    elif line[0] == 'E':
+                        dacw_error_array = line[2:-2].split(' ')
+                        self.error_sig_buffer.append(int(dacw_error_array[0]),
+                                                     float(dacw_error_array[1]))
+                    self.new_value.emit(line)
+            except KeyboardInterrupt:
+                pass
+            except Exception as ex:
+                print(ex)
+            # time.sleep(0.)
+        self.serial.disconnect()
+
+
+# ============================================================================
+class SerialConsole(pg.LayoutWidget):
+
+    new_command = pg.QtCore.Signal(str)
+
+    def __init__(self, window=None):
+        super().__init__()
+        self.console = QtGui.QTextEdit(window)
+        self.console.setReadOnly(True)
+        p = self.console.palette()
+        p.setColor(QtGui.QPalette.Base, QtGui.QColor('black'))
+        p.setColor(QtGui.QPalette.Text, QtGui.QColor('lightgray'))
+        self.console.setPalette(p)
+        self.console.document().setMaximumBlockCount(50)
+        self.command_box = QtGui.QLineEdit(self)
+        self.send_button = QtGui.QPushButton('Send')
+        self.addWidget(self.command_box, row=0, col=0)
+        self.addWidget(self.send_button, row=0, col=1)
+        self.addWidget(self.console, row=1, col=0, colspan=2)
+        self.send_button.clicked.connect(self.send_command)
+
+    def append_text(self, data):
+        self.console.append(data)
+
+    def send_command(self):
+        command = self.command_box.text()
+        self.new_command.emit(command)
+        self.command_box.setText("")
+        logging.debug("send_command %r", command)
+
+
+# ============================================================================
+class ControlWidget(pg.LayoutWidget):
+
+    def __init__(self, device, serial_reader, window=None):
+        super().__init__(window)
+        self.mac = device
+        self.sreader = serial_reader
+        self.window = window
+        self.p = Parameter.create(name='params', type='group')
+        self.startup = Parameter.create(name='Start Up', type='action')
+        self.p.addChild(self.startup)
+
+        gp0 = pTypes.GroupParameter(name='ADF4158 (Frequency Synthesis)')
+        self.set_all_regesiters = Parameter.create(
+                name='Set registers',
+                type='action')
+        #self.set_frequency = MyFloatParameter.create(
+        self.set_frequency = pTypes.SimpleParameter.create(
+                name='Frequency',
+                #type='float2',
+                value=self.mac.adf.frequency,
+                step = 1000,
+                suffix='Hz')
+        self.ramp_on = Parameter.create(
+                name='Ramp',
+                type='bool',
+                value=self.mac.adf.ramp_on)
+        self.set_deviation = Parameter.create(
+                name='Ramp deviation',
+                type='float',
+                value=self.mac.adf.total_freq_ramp,
+                step = 1000,
+                suffix='Hz')
+        self.clock2 = Parameter.create(
+                name='Clock2 divider',
+                type='int',
+                value=self.mac.adf.clk2_divider_value,
+                step = 1)
+        self.ramp_steps = Parameter.create(
+                name='Ramp steps', type='int',
+                value=self.mac.adf.ramp_steps, step = 1)
+        readonlygroup = pTypes.GroupParameter(name='Current values')
+        #self.act_frequency = MyFloatParameter.create(
+        self.act_frequency = pTypes.SimpleParameter.create(
+                name='Frequency',
+                #type='float2',
+                value=self.mac.adf.frequency,
+                readonly=True,
+                suffix='Hz',
+                enabled = False)
+        self.act_deviation = Parameter.create(
+                name='Ramp deviation',
+                type='float',
+                value=self.mac.adf.total_freq_ramp,
+                readonly=True,
+                suffix='Hz')
+        #self.ramp_time = MyFloatParameter.create(
+        self.ramp_time = pTypes.SimpleParameter.create(
+                name='Total ramp time',
+                #type='float2',
+                value=self.mac.adf.total_time_ramp,
+                readonly=True,
+                suffix='s')
+        readonlygroup.addChildren([self.act_frequency,
+                                   self.act_deviation,
+                                   self.ramp_time])
+        gp0.addChildren([self.set_all_regesiters, self.set_frequency,
+                         self.ramp_on, self.set_deviation,
+                         self.clock2, self.ramp_steps,
+                         readonlygroup])
+        self.p.addChild(gp0)
+
+        gp1 = pTypes.GroupParameter(name='Laser control')
+        self.laser_startup = Parameter.create(name='Startup', type='action')
+        self.laser_current = Parameter.create(
+            name='Current',
+            type='float',
+            value=self.mac.lascursour.current,
+            step = 0.001, suffix='mA')
+        self.tec_state = Parameter.create(
+            name="TEC state",
+            type="bool",
+            value=self.mac.lastecctrl.tec_state)
+        self.tec_volt_word = Parameter.create(
+            name="TEC word",
+            type="int",
+            value=self.mac.lastecctrl.tec_volt_word,
+            step = 1)
+        self.tec_resistance = Parameter.create(
+            name="TEC resistance",
+            type="float",
+            value=self.mac.lastecctrl.tec_resistance,
+            step = 100,
+            suffix="ohm")
+        gp1.addChildren([self.laser_startup,
+                         self.laser_current,
+                         self.tec_state,
+                         self.tec_volt_word,
+                         self.tec_resistance])
+        self.p.addChild(gp1)
+
+        gp2 = pTypes.GroupParameter(name='Magnetic field current source')
+        self.mag_current = Parameter.create(name='Current', type='float',
+                                            value=self.mac.magcursour.current,
+                                            step = 0.1, suffix='mA')
+        gp2.addChildren([self.mag_current])
+        self.p.addChild(gp2)
+
+        self.lockon = Parameter.create(name='Laser lock ON', type='action')
+        self.p.addChild(self.lockon)
+
+        gp3 = pTypes.GroupParameter(name='Scope')
+        self.scope_state = Parameter.create(name='Acquisition', type='bool',
+                                            value=False)
+        self.clear_error_sig_action = Parameter.create(name='Clear',
+                                                       type='action')
+        gp3.addChildren([self.scope_state,self.clear_error_sig_action])
+        self.p.addChild(gp3)
+
+        t = ParameterTree()
+        t.setParameters(self.p, showTop=False)
+        self.addWidget(t,row=0, col=0)
+
+        self.p.sigTreeStateChanged.connect(self.change)
+        self.startup.sigActivated.connect(self.mac.startup)
+        self.lockon.sigActivated.connect(self.mac.lock)
+        self.set_all_regesiters.sigActivated.connect(
+            self.mac.adf.send_all_reg)
+        self.laser_startup.sigActivated.connect(self.mac.lascursour.startup)
+
+        def clear_error_sig_plot():
+            self.sreader.error_sig_buffer.clear()
+
+        self.clear_error_sig_action.sigActivated.connect(clear_error_sig_plot)
+
+    def change(self, param, changes):
+        for param, change, data in changes:
+            if param is self.set_frequency:
+                self.mac.adf.frequency = param.value()
+                self.act_frequency.setValue(self.mac.adf.frequency)
+            elif param is self.ramp_on: self.mac.adf.ramp_on = param.value()
+            elif param is self.set_deviation:
+                self.mac.adf.total_freq_ramp = param.value()
+                self.act_deviation.setValue(self.mac.adf.total_freq_ramp)
+            elif param is self.clock2:
+                self.mac.adf.clk2_divider_value = param.value()
+                self.ramp_time.setValue(self.mac.adf.total_time_ramp)
+            elif param is self.ramp_steps:
+                self.mac.adf.ramp_steps = param.value()
+                self.ramp_time.setValue(self.mac.adf.total_time_ramp)
+                self.act_deviation.setValue(self.mac.adf.total_freq_ramp)
+            elif param is self.laser_current:
+                self.mac.lascursour.current = param.value()
+            elif param is self.tec_state:
+                self.mac.lastecctrl.tec_state = param.value()
+            elif param is self.tec_volt_word:
+                self.mac.lastecctrl.tec_volt_word = param.value()
+            elif param is self.tec_resistance:
+                self.mac.lastecctrl.tec_resistance = param.value()
+            elif param is self.mag_current:
+                self.mac.magcursour.current = param.value()
+            elif param is self.scope_state:
+                if param.value():
+                    self.window.live_graph_widget.start_timer()
+                    self.rp_scope.start()
+                else:
+                    self.window.live_graph_widget.stop_timer()
+                    self.rp_scope.stop()
+
+
+# ============================================================================
+class LiveGraphWidget(pg.GraphicsLayoutWidget):
+
+    def __init__(self, serial_reader, window=None):
+        super().__init__(window)
+        self.sreader = serial_reader
+        self.p1 = self.addPlot()
+        self.p1.showGrid(x=False, y=True, alpha=0.8)
+        self.curve1 = self.p1.plot(pen=pg.mkPen((0, 255, 155,255)))
+        self.nextRow()
+        self.p2 = self.addPlot()
+        self.p2.showGrid(x=False, y=True, alpha=0.8)
+        self.curve2 = self.p2.plot(pen=pg.mkPen((0, 155, 255,255)))
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update)
+        self.start_timer()
+
+    def update(self):
+        if self.sreader:
+            self.curve1.setData(y=self.sreader.current_buffer.get_data())
+            self.curve2.setData(y=self.sreader.quartzword_buffer.get_data())
+
+    def start_timer(self):
+        self.timer.start(100)
+
+    def stop_timer(self):
+        self.timer.stop()
+
+
+# ============================================================================
+class ErrorGraphWidget(pg.GraphicsLayoutWidget):
+
+    def __init__(self, serial_reader, window=None):
+        super().__init__(window)
+        self.sreader = serial_reader
+        self.p1 = self.addPlot()
+        self.p1.showGrid(x=True, y=True, alpha=0.8)
+        self.curve1 = self.p1.plot(pen=pg.mkPen((0, 255, 155,255)))
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update)
+        self.start_timer()
+
+    def update(self):
+        if self.sreader:
+            y = self.sreader.error_sig_buffer.get_data()
+            x = self.sreader.error_sig_buffer.get_times()
+            n = min(len(x), len(y))
+            if n > 1:
+                self.curve1.setData(x=x[0:n], y=y[0:n])
+
+    def start_timer(self):
+        self.timer.start(100)
+
+    def stop_timer(self):
+        self.timer.stop()
+
+
+# ============================================================================
+class MyWindow(QtGui.QMainWindow):
+
+    def __init__(self, device, serial_reader):
+        super().__init__()
+        self.setWindowTitle("qtMain")
+        self.resize(1400,900)
+
+        self.control_widget = ControlWidget(device, serial_reader, self)
+        self.live_graph_widget = LiveGraphWidget(serial_reader, self)
+        self.serial_console = SerialConsole(self)
+        self.error_sig_widget = ErrorGraphWidget(serial_reader, self)
+
+        area = DockArea()
+        self.setCentralWidget(area)
+
+        d1 = Dock("Controls", size=(400, 1))
+        d2 = Dock("Time plots", size=(1000, 1))
+        d3 = Dock("Console", size=(1, 1))
+        d4 = Dock("Error signal", size=(1000, 1))
+
+        area.addDock(d3, 'top')
+        area.addDock(d1, 'bottom')
+        area.addDock(d2, 'right',d1)
+        area.addDock(d4, 'bottom',d2)
+
+        d1.addWidget(self.control_widget)
+        d2.addWidget(self.live_graph_widget)
+        d3.addWidget(self.serial_console)
+        d4.addWidget(self.error_sig_widget)
+
+        serial_reader.new_value.connect(self.serial_console.append_text)
+        self.serial_console.new_command.connect(device.send)
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Enter \
+           or event.key() == QtCore.Qt.Key_Return:
+            self.serial_console.send_command()
+
+
+# ============================================================================
+def ask_for_port():
+    """Show a list of ports and ask the user for a choice. To make selection
+    easier on systems with long device names, also allow the input of an index.
+    """
+    sys.stderr.write('\n--- Available ports:\n')
+    ports = []
+    for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
+        sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
+        ports.append(port)
+    while True:
+        sys.stderr.write('--- Enter port index or full name: ')
+        port = input('')
+        try:
+            index = int(port) - 1
+            if not 0 <= index < len(ports):
+                sys.stderr.write('--- Invalid index!\n')
+                continue
+        except ValueError:
+            pass
+        else:
+            port = ports[index]
+        return port
+
+
+# =============================================================================
+def configure_logging(level):
+    """Configure logging:
+    - (debug) messages logged to console
+    - messages logged in a file located in the home directory
+    """
+    log_console_format = "%(asctime)s [%(threadName)-12.12s]" + \
+        "[%(levelname)-6.6s] %(filename)s %(funcName)s (%(lineno)d): " + \
+        "%(message)s"
+    console_formatter = logging.Formatter(log_console_format)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+
+
+# =============================================================================
+def parse_cmd_line():
+    """Parse command line.
+    :returns: argparse namespace (object)
+    """
+    parser = argparse.ArgumentParser(description='DdsController')
+    '''parser.add_argument('-ini', '--ini_file',
+                        help="Specifiy ini file to use.")
+    if path.isfile(ini_file) is True:
+        check_ini_file(ini_file)  # see ddsctrl
+    else:
+        check_ini_file()'''
+    parser.add_argument('-p', '--port',
+                        help="Serial port of MAC device.")
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help="Enable debug log.")
+    args = parser.parse_args()
+    return args
+
+
+# ============================================================================
+def main(port):
+    mac = md.Mac()
+    mac.connect(port)
+    serial_reader = SerialReader(mac.ser)
+    app = QtGui.QApplication(sys.argv)
+    win = MyWindow(mac, serial_reader)
+    serial_reader.start()
+    win.show()
+    sys.exit(app.exec_())
+
+
+# ============================================================================
+signal.signal(signal.SIGINT, signal.SIG_DFL)  # Ctrl-c closes the application
+
+args = parse_cmd_line()
+if args.debug is True:
+    configure_logging(logging.DEBUG)
+else:
+    configure_logging(logging.INFO)
+if args.port:
+    port = args.port
+else:
+    port = ask_for_port()
+
+main(port)
