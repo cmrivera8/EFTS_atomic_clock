@@ -34,23 +34,42 @@ printBits(Fmsb)
 fprintf("> LSb value of FRAC:\n")
 printBits(Flsb)
 
-%% Determine derised RFout based on hex values sent
+%% Determine desired RFout based on hex values sent
 %% Content of function "void ADF4158_Set_CPT()"
 clear all
 clc
 format long eng
 
-% 
 REFin = 10e6;	% Reference clock
-Fmsb = 2581;	% From R0 = 0xF8E5D0A8
-INT = 459;      % From R0 = 0xF8E5D0A8
-Flsb = 592;     % From R1 = 0x1280001
 
-% "Precedent" commented value for R1
-% REFin = 10e6;     % Reference clock
+% Input individual values:
+% Original ADF4158_Set_CPT function content:
+% Fmsb = 2581;	% From R0 = 0xF8E5D0A8
+% INT = 459;      % From R0 = 0xF8E5D0A8
+% Flsb = 592;     % From R1 = 0x1280001
+
+% "Precedent" commented value for R1 in ADF4158_Set_CPT:
 % Fmsb = 2581;      % From R0 = 0xFFF8001
 % INT = 459;        % From R0 = 0xF8E5D0A8
 % Flsb = 8191;      % From R1 = 0x1280001
+
+% Original ADF4158_Set_CPT_lock function content:
+% Fmsb = 2610;	% From R0 = 0xE5D190
+% INT = 459;      % From R0 = 0xE5D190
+% Flsb = 4126;     % From R1 = 0x80F0001
+
+% Commented values in ADF4158_Set_CPT_lock function:
+% Fmsb = 2597;	% From R0 = 0xE5D128
+% INT = 459;      % From R0 = 0xE5D128
+% Flsb = 7093;     % From R1 = 0xDDA8001
+
+% Input registers:
+r1=0x1280001;
+r0=0xF8E5D0A8;
+
+Flsb=double(bi2de(bitget(r1,28:-1:16),'left-msb'));
+Fmsb=double(bi2de(bitget(r0,15:-1:4),'left-msb'));
+INT=double(bi2de(bitget(r0,27:-1:16),'left-msb'));
 
 FRAC = Fmsb*2^13+Flsb;
 % PHASE FREQUENCY DETECTOR (PFD)
@@ -73,9 +92,7 @@ function printBits(value)
     fprintf("DEC: %d\n", value)
     fprintf("HEX: %s\n", dec2hex(value))
     fprintf("BIN: ")
-%     bin_num_array = de2bi(value);
-%     bin_num = str2num(char(bin_num_array + '0'))
-    bin_num = de2bi(value);
+    bin_num = de2bi(value,'left-msb');
     fprintf("%d", bin_num)
     fprintf("\n")
     format short eng

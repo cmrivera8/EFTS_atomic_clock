@@ -1,0 +1,21 @@
+In function "ADC_startup()":
+
+Registers of Datasheet page 26:
+
+>> "SPI.transfer(B00000110);"
+0 000 011 0
+Single-Shot conversion start: 0, Disabled
+Input multiplexer configuration: 000, AINP is AIN0 and AINN is AIN1 (default)
+    AINP and AINN denote the selected positive and negative inputs.
+Programmable gain amplifier: 011, FSR is ±1.024 V
+    FSR: full-scale range 
+Device operating mode: 0, Continuous conversion mode.
+
+>> "SPI.transfer(B11100011);"
+111 0 0 01 1
+Data rate: 111, 860 SPS (Samples per second)
+Temperature sensor mode: 0, ADC mode (default)
+Pullup enable: 0, Pullup resistor disabled on DOUT/DRDY pin
+No operation: 01, Valid data, update the Config register (default)
+Reserved: 1, No effect.
+

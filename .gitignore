@@ -1,3 +1,5 @@
 *.pyc
+*.asv
 *.~vsdx
-/Documentation
+# /Documentation
+/Documentation/To-do list.txt
