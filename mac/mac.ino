@@ -5,11 +5,11 @@
 // Adc 1V
 // lock step
 // Added D part to CPT lock
-// new Laser Lock ONE wrzucone do ErrorDisplay()
-// Wersja 2.0 dodane przedrostki DQI do interfejsu
-// Wersja po uporzadkowaniu i dodaniu tlumika RF
+// new Laser Lock ONE put into ErrorDisplay ()
+// Version 2.0 added DQI prefixes to interface
+// Version after tidying up and adding the RF suppressor
 // FSR ADC 256 mV
-// Test sygnalu bledu przy modulacji TEC lasera
+// Test of error signal with laser TEC modulation
 // FM dev 1.67kHz
 
 const int CS_DAC_quartz = 2;                              // Set CS pins
@@ -211,22 +211,22 @@ void print_menu() {                                      // Prints main menu.
 }
 
 
- void DAC_load(int CS_pin) {                             // Loads data to LTC1655L DAC through SPI, takes the CS pin as input
+ void DAC_load(int CS_pin) {                             // Loads data to LTC1655L 16-bit DAC through SPI, takes the CS pin as input
    unsigned int value = Serial.parseInt();               // Parses an int from the serial input
-   byte byte1 = (value >> 8);
-   byte byte2 = (value & 0xff);
+   byte byte1 = (value >> 8);   // byte1 (MSb) = 0x xxxx xxxx 0000 0000
+   byte byte2 = (value & 0xff); // byte2 (LSb) = 0x 0000 0000 xxxx xxxx
    digitalWrite(CS_pin, LOW);
    SPI.transfer(byte1);                                  
    SPI.transfer(byte2);
-   digitalWrite(CS_pin, HIGH);
+   digitalWrite(CS_pin, HIGH);  // The DAC register loads the data from the shift register when CS/LD is pulled high.
    Serial.print("D DAC word: ");
    Serial.print(byte1, BIN);
    Serial.println(byte2, BIN);
 }
 
-void DAC_load(int CS_pin, unsigned int value) {          // Loads data to LTC1655L DAC through SPI, takes the CS pin and value to load (uint) as input
-   byte byte1 = (value >> 8);
-   byte byte2 = (value & 0xff);
+void DAC_load(int CS_pin, unsigned int value) {          // Loads data to LTC1655L 16-bit DAC through SPI, takes the CS pin and value to load (uint) as input
+   byte byte1 = (value >> 8);   
+   byte byte2 = (value & 0xff); 
    digitalWrite(CS_pin, LOW);
    SPI.transfer(byte1);                                 
    SPI.transfer(byte2);
@@ -283,33 +283,43 @@ void ADF4158_Write(int value1) {                         // Writes one PLL regis
   digitalWrite(CS_ADF4158, HIGH);
 }
 
-
-void ADF4158_Set_CPT() {                                 // Sets PLL values to show CPT signal
-  ADF4158_Write(0x7);
-  ADF4158_Write(0x800006);    //R6= Ramp2
-  ADF4158_Write(0x3E86);
-  ADF4158_Write(0x800005);
-  ADF4158_Write(0x1002A5);
-  ADF4158_Write(0x783204);      //clk div mod; ramp divider
-  ADF4158_Write(0x43);          //R3= continuous sawtooth ramp
-  ADF4158_Write(0x40800A);      //R2= i charge pump (cp) set to 0.35mA /cyrus
-  ADF4158_Write(0x1280001);     //R1= PRESCEDENT FFF8001
-  ADF4158_Write(0xF8E5D0A8);    //R0= pll setting= Muxout ramp Status on 0xF8E5D0A8
+// CR: I found this function sets the RF synthesizer to 4.596301446 GHz exactly with a 10 MHz reference, with ramp mode activated.
+void ADF4158_Set_CPT() {        // Sets PLL values to show CPT signal
+  ADF4158_Write(0x7);           // R7: Delay disabled
+  ADF4158_Write(0x800006);      // R6 - Ramp 2: Setting the number of steps to 0.
+  ADF4158_Write(0x3E86);        // R6 - Ramp 1: Setting the number of steps to 2 000.
+  ADF4158_Write(0x800005);      // R5 - Ramp 2: Disable the deviation.
+  ADF4158_Write(0x1002A5);      // R5 - Ramp 1: Setting the deviation to "84" and offset to "2".
+  ADF4158_Write(0x783204);      // R4: Set the clock divider mode to "ramp divider" and the divider value to 100.
+  ADF4158_Write(0x43);          // R3: Set the ramp to continuous sawtooth.
+  ADF4158_Write(0x40800A);      // R2: i charge pump (cp) set to 0.35mA /cyrus (CR: Set current setting to 0.31, r-counter divide ratio to 1 and clock divider to 1.)
+  ADF4158_Write(0x1280001);     // R1: PRESCEDENT FFF8001 (CR: This register sets the LSb of the FRAC value)
+  ADF4158_Write(0xF8E5D0A8);    // R0: pll setting= Muxout ramp Status on 0xF8E5D0A8 (CR: Set the MSb of the FRAC value and INT value)
 }
+// From the comments the "precedent" values were:
+// R1: 0xFFF8001
+// R0: 0xF8E5D0A8 (no change)
+// This would set the frequency to 4.5963037106 GHz
 
-
+// CR: I found this function sets the RF synthesizer to 4.5963733 GHz exactly with a 10 MHz reference, without ramp mode activated.
 void ADF4158_Set_CPT_lock(){
-  ADF4158_Write(0x7);
-  ADF4158_Write(0x800006);
-  ADF4158_Write(0x6);
-  ADF4158_Write(0x800005);
-  ADF4158_Write(0x200695);
-  ADF4158_Write(0x180104);
-  ADF4158_Write(0x143);
-  ADF4158_Write(0x40800A);     //i charge pump (cp) set to 0.35mA 
-  ADF4158_Write(0x80F0001);    //OxDDA8001 ces 2 registres**  fonctionne bien avec la synthese J 
-  ADF4158_Write(0xE5D190);      //0xE5D128 ne pas oublier ce registre** MSB FRAC
+  ADF4158_Write(0x7);         // R7: Delay disabled
+  ADF4158_Write(0x800006);    // R6 - Ramp 2: Setting the number of steps to 0.
+  ADF4158_Write(0x6);         // R6 - Ramp 1: Setting the number of steps to 0.
+  ADF4158_Write(0x800005);    // R5 - Ramp 2: Disable the deviation.
+  ADF4158_Write(0x200695);    // R5 - Ramp 1: Setting the deviation to "210" and offset to "4".
+  ADF4158_Write(0x180104);    // R4: Set the clock divider mode to "ramp divider" and the divider value to 2.
+  ADF4158_Write(0x143);       // R3: Set the ramp to continuous sawtooth (FSK enabled).
+  ADF4158_Write(0x40800A);    // R2: i charge pump (cp) set to 0.35mA /cyrus (CR: Set current setting to 0.31, r-counter divide ratio to 1 and clock divider to 1.)
+  ADF4158_Write(0x80F0001);   //OxDDA8001 ces 2 registres**  fonctionne bien avec la synthese J (CR: )
+  ADF4158_Write(0xE5D190);    //0xE5D128 ne pas oublier ce registre** MSB FRAC (CR: Set MUXOUT CONTROL to "THREE-STATE OUTPUT" and the MSb of the FRAC value and INT value)
 }
+// From the comments the another option is found:
+// R1: 0xDDA8001
+// R0: 0xE5D128
+// This would set the frequency to 4.5963424459 GHz
+
+
 
 void set_synth_CPT(){
   DAC_load(CS_DAC_quartz, quartz_init);
@@ -352,11 +362,11 @@ void VCSEL_startup(){                                    // VCSEL slow-start, sl
 
 void Show_CPT(){
   DAC_load(CS_DAC_quartz, quartz_init);
-  VCSEL_startup();                                       // Ramp-up VCSEL current
-  TEC_DAC_load(TEC_WORD);                                    // Set VCSEL TEC Word
+  VCSEL_startup();                                      // Ramp-up VCSEL current
+  TEC_DAC_load(TEC_WORD);                               // Set VCSEL TEC Word
   TEC_on();
   ADF4158_Set_CPT();
-  DAC_load(CS_mag, 10000);                               // Sets magnetic field word to 10000
+  DAC_load(CS_mag, 10000);                              // Sets magnetic field word to 10000
 }
 
 
@@ -472,7 +482,7 @@ int NewLaserLockONE(int previous_DAC_val){
 void LaserLock(){
   ADC_startup();
   int ButtonState = 0;
-  ButtonState = digitalRead(ButtonPin);
+  ButtonState = digitalRead(ButtonPin);       // CR: This line doesn't do anything here
   printDebug("Lock ON");
   int previous_ADC_val = ADC_read();
   int previous_DAC_val = init_VCSEL_current;
