@@ -32,6 +32,7 @@ class SerialReader(pg.QtCore.QThread):
     quartzword_buffer = misc.Buffer(10000)
     error_sig_buffer = misc.Buffer(10000)
     absorption_sig_buffer = misc.Buffer(200)
+    marker = misc.Buffer(1)
 
     def __init__(self, serial):
         super().__init__()
@@ -51,6 +52,7 @@ class SerialReader(pg.QtCore.QThread):
                         line = line[2:-2]
                     elif line[0] == 'I':
                         self.current_buffer.append(time.time(),int(line[2:-2]))
+                        self.marker.append(time.time(),int(line[2:-2]))
                     elif line[0] == 'Q':
                         self.quartzword_buffer.append(time.time(),int(line[2:-2]))
                     elif line[0] == 'E':
@@ -367,9 +369,11 @@ class AbsorptionGraphWidget(pg.GraphicsLayoutWidget):
         self.timer.timeout.connect(self.update)
         self.start_timer()
         # Creating marker to indicate maximum absorption
-        self.text = pg.TextItem(html='<div style="text-align: center"><span style="color: #FFF;">Maximum absorption at</span><br><span style="color: #FF0; font-size: 12pt;">0</span></div>', anchor=(-0.12,1.3), border='w', fill=(0, 0, 255, 100))
+        self.text = pg.TextItem(html='<div style="text-align: center"><span style="color: #FFF;">Maximum absorption at</span><br><span style="color: #FF0; font-size: 12pt;">0</span></div>', anchor=(-0.2,1.3), border='w', fill=(0, 0, 255, 100))
+        self.text.setPos(0,0)
         self.p1.addItem(self.text)
         self.arrow = pg.ArrowItem(angle=-45)
+        self.arrow.setPos(0,0)
         self.p1.addItem(self.arrow)
         # Marker 2:
         self.curvePoint = pg.CurvePoint(self.curve1)
@@ -383,6 +387,7 @@ class AbsorptionGraphWidget(pg.GraphicsLayoutWidget):
         if self.sreader:
             y = self.sreader.absorption_sig_buffer.get_data()
             x = self.sreader.absorption_sig_buffer.get_times()
+            m = self.sreader.marker.get_data()
             n = min(len(x), len(y))
             if n > 1:
                 # Sorting arrays based on x axis to avoid lines going from left to right
@@ -394,7 +399,7 @@ class AbsorptionGraphWidget(pg.GraphicsLayoutWidget):
                     # Convert overflow into saturation
                     for [i,value] in enumerate(y):
                         if(value<20000 or value>65535):
-                            y[i]=65535
+                            y[i]=65535+y[i]
                     # Correct x axis outliers:
                     for [i,value] in enumerate(x):
                         if(value<29000 or value>34000):
@@ -415,6 +420,12 @@ class AbsorptionGraphWidget(pg.GraphicsLayoutWidget):
                 self.curvePoint.setPos(float(index)/(x.size-1))
                 # self.text2.viewRangeChanged()
                 self.text2.setText('[%0.1f, %0.1f]' % (x[index], y[index]))
+            
+            # Move locking frequency marker based on global variable (Value received at "l" function)
+            # try:
+            #     self.arrow.setPos(m, y.min())
+            # except:
+            #     pass
                 
                 
                 
