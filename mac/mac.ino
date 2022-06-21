@@ -28,6 +28,7 @@ const int lock_step = 1;         // Laser lock step
 const int averages = 1;          // Number of averages before each laser lock step
 int init_VCSEL_current = 30000;  // Laser current word after initial startup ->50978
 const int quartz_init = 10000;   // Initial quartz dac word -1500 avec synthese j
+int global_DAC_VCSEL_current = 30000;
 float kp = 0.4;
 float ki = 0;
 float kd = 0;
@@ -212,16 +213,17 @@ void print_menu() {                                      // Prints main menu.
 
 
  void DAC_load(int CS_pin) {                             // Loads data to LTC1655L 16-bit DAC through SPI, takes the CS pin as input
-   unsigned int value = Serial.parseInt();               // Parses an int from the serial input
-   byte byte1 = (value >> 8);   // byte1 (MSb) = 0x xxxx xxxx 0000 0000
-   byte byte2 = (value & 0xff); // byte2 (LSb) = 0x 0000 0000 xxxx xxxx
-   digitalWrite(CS_pin, LOW);
-   SPI.transfer(byte1);                                  
-   SPI.transfer(byte2);
-   digitalWrite(CS_pin, HIGH);  // The DAC register loads the data from the shift register when CS/LD is pulled high.
-   Serial.print("D DAC word: ");
-   Serial.print(byte1, BIN);
-   Serial.println(byte2, BIN);
+  unsigned int value = Serial.parseInt();               // Parses an int from the serial input
+  global_DAC_VCSEL_current=value; // test
+  byte byte1 = (value >> 8);   // byte1 (MSb) = 0x xxxx xxxx 0000 0000
+  byte byte2 = (value & 0xff); // byte2 (LSb) = 0x 0000 0000 xxxx xxxx
+  digitalWrite(CS_pin, LOW);
+  SPI.transfer(byte1);                                  
+  SPI.transfer(byte2);
+  digitalWrite(CS_pin, HIGH);  // The DAC register loads the data from the shift register when CS/LD is pulled high.
+  Serial.print("D DAC word: ");
+  Serial.print(byte1, BIN);
+  Serial.println(byte2, BIN);
 }
 
 void DAC_load(int CS_pin, unsigned int value) {          // Loads data to LTC1655L 16-bit DAC through SPI, takes the CS pin and value to load (uint) as input
@@ -445,7 +447,8 @@ void NewLaserLock(){
   ButtonState = digitalRead(ButtonPin);
   printDebug("Lock ON");
   int value1, value2;
-  int previous_DAC_val = init_VCSEL_current;
+  // int previous_DAC_val = init_VCSEL_current;
+  int previous_DAC_val = global_DAC_VCSEL_current;
   int Error, New_DAC_val;
   while(ButtonState == LOW){
     digitalWrite(Lock_trigger,(!digitalRead(61)));
@@ -458,7 +461,9 @@ void NewLaserLock(){
     DAC_load(CS_VCSEL, New_DAC_val);
     previous_DAC_val = New_DAC_val;
     ButtonState = digitalRead(ButtonPin);
-    Serial.println("I "+String(New_DAC_val));
+    if(countCycles(100)){
+      Serial.println("I "+String(New_DAC_val));
+    }
   }
   printDebug("Lock OFF");
 }
@@ -545,20 +550,48 @@ void ErrorDisplay(){
   }
   
 }
-
+// Function to count cycles and avoid excessive serial communication/plotting, returns 1 once the max_cycles threshold is met
+int cycle=0;
+int countCycles(int max_cycles){
+  if (cycle<max_cycles){
+      cycle++;
+      return 0;
+    }else{
+      cycle=0;
+      return 1;
+  }
+}
+//
 void LaserScan(unsigned int startVal){
+  ADC_startup();
   digitalWrite(Lock_trigger, LOW);
   int ButtonState = 0;
   ButtonState = digitalRead(ButtonPin);
+  int n_measurements = 200;
+  int cycles_per_sample = 7; // aprox: 1 second refresh rate
+  int enable_measurement=0;
+  // int cycle = 0;
+  int index = 0;
+  int value;
+  int adc_values[n_measurements];
+  int word_value[n_measurements];
   while(ButtonState == LOW){
+    int old_i = 0;
     toggle_Trigger();
     for(unsigned int i = startVal; i < (startVal + 5001); i += 1){ //variable init scanstart = 45000
-       DAC_load(CS_VCSEL, i);
-       //Serial.println(i);
-       delayMicroseconds(10);
+      DAC_load(CS_VCSEL, i);
+            
+      if (i-old_i>5000/n_measurements && enable_measurement){
+        Serial.println("A "+String(i)+" "+String(ADC_read()));
+        old_i = i;        
+      }else{
+        delayMicroseconds(10);  
+      }
     }
+    enable_measurement=countCycles(cycles_per_sample);
     ButtonState = digitalRead(ButtonPin); 
   }
+
 }
 
 
@@ -567,17 +600,17 @@ void QuartzScan(){
   ADF4158_Set_CPT_lock();
   digitalWrite(Lock_trigger, LOW);
   digitalWrite(TXDATA, LOW);
-  for(unsigned int i = 0; i < 41530; i += 10){
-       DAC_load(CS_DAC_quartz, i);
-       delayMicroseconds(200);
-       toggle_Trigger();
-       toggle_TXDATA();
-       int val1 = ADC_read();
-       toggle_Trigger();
-       toggle_TXDATA();
-       int val2 = ADC_read();
-       int Error = val1-val2;
-       Serial.println("E "+String(i)+" "+String(Error));
+  for(unsigned int i = 0; i < 41530; i += 5){ //10
+    DAC_load(CS_DAC_quartz, i);
+    delayMicroseconds(200);
+    toggle_Trigger();
+    toggle_TXDATA();
+    int val1 = ADC_read();
+    toggle_Trigger();
+    toggle_TXDATA();
+    int val2 = ADC_read();
+    int Error = val1-val2;
+    Serial.println("E "+String(i)+" "+String(Error));
   }
   
 }
