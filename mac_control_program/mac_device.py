@@ -41,12 +41,12 @@ class LaserCurrentSource(SubComponent):
 
     @property
     def current(self):
-        return self._current_word / (2.**16) * 2.5
+        return (self._current_word / (2.**16)) * 2.5
 
     @current.setter
     def current(self, value):
         assert 0 <= value < 2
-        self._current_word = int(value/2.5*(2.**16))
+        self._current_word = int((value/2.5)*2.**16)
         self.parent.send("9 " + str(self._current_word))
 
 
@@ -117,7 +117,20 @@ class Mac():
         self.lascursour = LaserCurrentSource(self)
         self.magcursour = MagFieldCurrentSource(self)
         self.lastecctrl = LaserTECcontroller(self)
-
+        # Carlos RIVERA:
+        # Sub-group 1: Ramp
+        self.start_current=28000 # 1.0681 mA
+        self.end_current=34000 # 1.2970 mA
+        self.number_samples=200
+        # Group 2: Laser lock
+        self.laser_lock_initial_value=31457 #1.2 mA
+        self.laser_mod_width=1 # 38.147 nA = 1 machine unit
+        self.laser_kp=0.2
+        # Group 3: Quartz lock
+        self.quartz_lock_initial_value=10000 #Check! Conversion pending
+        self.quartz_kp=0.4
+        self.quartz_ki=0
+        self.quartz_kd=0
     def connect(self, port):
         self.ser.port = port
         if not self.ser.is_open:
@@ -168,6 +181,33 @@ class Mac():
     def startup(self):
         logging.info("Start up sequence")
         self.send("2")
+        time.sleep(1) # 1 second
+        # self.send("t 29000 34000 5000 s")
+
+    def starts_ramp(self):
+        self.startup()
+        logging.info("Start ramp of the laser")
+        command="t {} {} {} s".format(self.start_current,self.end_current,self.number_samples)
+        print(command)
+        self.send(command)
+    
+    def lock_laser(self):
+        logging.info("Start lock of the laser")
+        command = "a {} {} {} {}".format(self.quartz_kp,self.quartz_ki,self.quartz_kd,self.laser_kp)
+        self.send(command)
+        command = "i {} {} l".format(self.laser_lock_initial_value,self.laser_mod_width)
+        self.send(command)
+    
+    def lock_quartz(self):
+        logging.info("Start lock of the quartz")
+        command = "a {} {} {} {}".format(self.quartz_kp,self.quartz_ki,self.quartz_kd,self.laser_kp)
+        self.send(command)
+        command = "i {} {}".format(self.laser_lock_initial_value,self.laser_mod_width)
+        self.send(command)
+        command = "j {}".format(self.quartz_lock_initial_value)
+        self.send(command)
+        command = "b"
+        self.send(command)
 
     def lock(self):
         logging.info("Lock ON")

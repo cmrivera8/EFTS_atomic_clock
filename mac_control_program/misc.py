@@ -136,3 +136,28 @@ def saveThisConfig(equipmentList,comment=None):
                                           params["date"],
                                           params["time"])
     saveYaml(params, filename=filename)
+
+# Carlos RIVERA functions:
+def word_to_current(value):
+    # 1 unit (word) = 0.00004 mA
+    return (value/2**16)*2.5
+
+def current_to_word(value):
+    # print(int((value/2.5)*2**16))
+    return int((value/2.5)*2**16)
+
+def word_to_voltage(value):
+    p1=0.000031126330400437179739270288081343
+    p2=0.46047937162911467545711730053881
+    return p1*value+p2
+
+def voltage_to_word(value):
+    p1=0.000031126330400437179739270288081343
+    p2=0.46047937162911467545711730053881
+    return (value-p2)/p1
+
+def word_to_frequency(value):
+    pass
+
+def frequency_to_word(value):
+    pass

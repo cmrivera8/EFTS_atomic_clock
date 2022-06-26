@@ -28,11 +28,11 @@ import numpy as np
 class SerialReader(pg.QtCore.QThread):
 
     new_value = pg.QtCore.Signal(str)
-    current_buffer = misc.Buffer(10000)
-    quartzword_buffer = misc.Buffer(10000)
-    error_sig_buffer = misc.Buffer(10000)
+    current_buffer = misc.Buffer(1000)
+    quartzword_buffer = misc.Buffer(1000)
+    error_sig_buffer = misc.Buffer(8306)
     absorption_sig_buffer = misc.Buffer(200)
-    marker = misc.Buffer(1)
+    marker = misc.Buffer(2)
 
     def __init__(self, serial):
         super().__init__()
@@ -52,6 +52,9 @@ class SerialReader(pg.QtCore.QThread):
                         line = line[2:-2]
                     elif line[0] == 'I':
                         self.current_buffer.append(time.time(),int(line[2:-2]))
+                        # self.marker.append(time.time(),int(line[2:-2]))
+                    elif line[0] == 'M':
+                        # self.current_buffer.append(time.time(),int(line[2:-2]))
                         self.marker.append(time.time(),int(line[2:-2]))
                     elif line[0] == 'Q':
                         self.quartzword_buffer.append(time.time(),int(line[2:-2]))
@@ -76,8 +79,10 @@ class SerialReader(pg.QtCore.QThread):
                             dacw_absorption = line[2:-2].split(' ')
                             # if float(dacw_absorption[1])==2:
                                 # self.absorption_sig_buffer.clear()
-                            self.absorption_sig_buffer.append(int(dacw_absorption[0]),
-                                                    float(dacw_absorption[1]))
+                            self.absorption_sig_buffer.append(
+                                (int(dacw_absorption[0])),
+                               (float(dacw_absorption[1]))
+                            )
                                 
                             
 
@@ -133,10 +138,230 @@ class ControlWidget(pg.LayoutWidget):
         self.mac = device
         self.sreader = serial_reader
         self.window = window
+        
         self.p = Parameter.create(name='params', type='group')
-        self.startup = Parameter.create(name='Start Up', type='action')
+        self.startup = Parameter.create(name='Start Up', type='action',visible=False)
         self.p.addChild(self.startup)
+        ## New controls
+        # Group 1: Laser control
+        #Adding group
+        group_0=pTypes.GroupParameter(name='Laser control')
+        children_list=[]
+        #Adding textbox
+        self.set_laser_frequency = pTypes.SimpleParameter.create(
+            name='Current',
+            type='float',
+            value=1.163,
+            step = 0.01,
+            min = 0,
+            max = 1.7,
+            decimals=6,
+            suffix='mA')
+        children_list.append(self.set_laser_frequency)
+        self.set_laser_temperature = pTypes.SimpleParameter.create(
+            name='Temperature*',
+            type='float',
+            # value=self.mac.adf.total_freq_ramp,
+            step = 0.1,
+            suffix='ohm')
+        children_list.append(self.set_laser_temperature)
+        # Sub-group 1: Ramp
+        #Adding sub-group
+        group_0_1=pTypes.GroupParameter(name='Ramp')
+        sub_children_list=[]
+        self.set_ramp_start = pTypes.SimpleParameter.create(
+            name='Start current',
+            type='float',
+            value=1.1,
+            step = 0.01,
+            max = 1.7, #Check
+            min = 0,
+            decimals=6,
+            suffix='mA')
+        sub_children_list.append(self.set_ramp_start)
+        self.set_ramp_end = pTypes.SimpleParameter.create(
+            name='End current',
+            type='float',
+            value=1.3,
+            step = 0.01,
+            max = 1.7,
+            min = 0,
+            decimals=6,
+            suffix='mA')
+        sub_children_list.append(self.set_ramp_end)
+        self.set_ramp_samples =  pTypes.SimpleParameter.create(
+            name='Samples',
+            type='int',
+            value=200,
+            step = 10,
+            )
+        sub_children_list.append(self.set_ramp_samples)
+        # Adding button
+        self.btn_start_ramp = Parameter.create(
+            name='Start ramp',
+            type='action')
+        sub_children_list.append(self.btn_start_ramp)
+        group_0_1.addChildren(sub_children_list)
+        children_list.append(group_0_1)
+        #Adding children to group
+        group_0.addChildren(children_list)
+        self.p.addChild(group_0)
+        
+        # Group 2: Laser lock
+        group_1=pTypes.GroupParameter(name='Laser lock')
+        children_list=[]
+        self.set_laser_lock_initial_value = pTypes.SimpleParameter.create(
+            name='Initial guess', #Check
+            type='float',
+            value=1.2,
+            step = 0.01,
+            max = 1.7,
+            min = 0,
+            decimals=6,
+            suffix='mA')
+        children_list.append(self.set_laser_lock_initial_value)
+        self.set_laser_mod_width = pTypes.SimpleParameter.create(
+            name='Modulation width', #Check
+            type='float',
+            value=(3.8147e-05)/1000,
+            step =(3.8147e-05)/1000,
+            max = 1.7, #Check
+            min = (3.8147e-05)/1000,
+            decimals=6,
+            siPrefix=True,
+            suffix='A')
+        children_list.append(self.set_laser_mod_width)
+        self.set_laser_kp = pTypes.SimpleParameter.create(
+            name='kp', #Check
+            type='float',
+            value=0.2,
+            step = 0.001,
+            # max = 1.7, #Check
+            min = 0.001,
+            decimals=6)
+        children_list.append(self.set_laser_kp)
+        self.set_laser_ki = pTypes.SimpleParameter.create(
+            name='ki', #Check
+            type='float',
+            value=0,
+            step = 0.001,
+            # max = 1.7, #Check
+            min = 0,
+            decimals=6,
+            visible=False)
+        children_list.append(self.set_laser_ki)
+        self.set_laser_kd = pTypes.SimpleParameter.create(
+            name='kd', #Check
+            type='float',
+            value=0,
+            step = 0.001,
+            # max = 1.7, #Check
+            min = 0,
+            decimals=6,
+            visible=False)
+        children_list.append(self.set_laser_kd)
+        self.btn_start_laser_lock = Parameter.create(
+            name='Start lock',
+            type='action')
+        children_list.append(self.btn_start_laser_lock)
+        group_1.addChildren(children_list)
+        # group_1.addChildren([self.set_laser_lock_initial_value,self.set_laser_mod_width,self.set_laser_kp,self.set_laser_ki,self.set_laser_kd,self.btn_start_laser_lock])
+        self.p.addChild(group_1)
+        
+        # Group 3: Quartz lock
+        group_2=pTypes.GroupParameter(name='Quartz lock')
+        children_list=[]
+        self.set_quartz_lock_initial_value = pTypes.SimpleParameter.create(
+            name='Initial guess*', #Check
+            type='float',
+            value=10000, #Check! Conversion pending
+            step = 0.01,
+            # max = 1.7,
+            min = 0,
+            decimals=6,
+            suffix='Hz')
+        children_list.append(self.set_quartz_lock_initial_value)
+        self.set_quartz_mod_width = pTypes.SimpleParameter.create(
+            name='Modulation width*', #Check
+            type='float',
+            value=1, #Check! Conversion pending
+            step = 0.01,
+            # max = 1.7, #Check
+            min = 1,
+            decimals=6,
+            suffix='Hz')
+        children_list.append(self.set_quartz_mod_width)
+        self.set_quartz_kp = pTypes.SimpleParameter.create(
+            name='kp*', #Check
+            type='float',
+            value=0.4,
+            step = 0.001,
+            # max = 1.7, #Check
+            min = 0.001,
+            decimals=6)
+        children_list.append(self.set_quartz_kp)
+        self.set_quartz_ki = pTypes.SimpleParameter.create(
+            name='ki*', #Check
+            type='float',
+            value=0,
+            step = 0.001,
+            # max = 1.7, #Check
+            min = 0,
+            decimals=6)
+        children_list.append(self.set_quartz_ki)
+        self.set_quartz_kd = pTypes.SimpleParameter.create(
+            name='kd*', #Check
+            type='float',
+            value=0,
+            step = 0.001,
+            # max = 1.7, #Check
+            min = 0,
+            decimals=6)
+        children_list.append(self.set_quartz_kd)
+        self.btn_start_quartz_lock = Parameter.create(
+            name='Start lock*',
+            type='action')
+        children_list.append(self.btn_start_quartz_lock)
+        group_2.addChildren(children_list)
+        self.p.addChild(group_2)
+        # Group 4: CPT lock
+        group_3=pTypes.GroupParameter(name='CPT lock')
+        children_list=[]
+        self.label_laser_lock_value = pTypes.SimpleParameter.create(
+            name='Laser lock current*', #Check
+            type='float',
+            # value=self.mac.adf.total_freq_ramp,
+            step = 0.01,
+            max = 1.7,
+            min = 0,
+            decimals=6,
+            readonly=True,
+            suffix='mA')
+        children_list.append(self.label_laser_lock_value)
+        self.label_quartz_lock_value = pTypes.SimpleParameter.create(
+            name='Quartz lock frequency*', #Check
+            type='float',
+            # value=self.mac.adf.total_freq_ramp,
+            step = 0.01,
+            max = 1.7,
+            min = 0,
+            decimals=6,
+            readonly=True,
+            suffix='Hz')
+        children_list.append(self.label_quartz_lock_value)
+        self.btn_start_CPT_lock = Parameter.create(
+            name='Start lock*',
+            type='action')
+        children_list.append(self.btn_start_CPT_lock)
+        group_3.addChildren(children_list)
+        self.p.addChild(group_3)
 
+        group_4=pTypes.GroupParameter(name='Others')
+        children_list=[]
+        self.p.addChild(group_4)
+
+        
+        ## OLD CONTROLS
         gp0 = pTypes.GroupParameter(name='ADF4158 (Frequency Synthesis)')
         self.set_all_regesiters = Parameter.create(
                 name='Set registers',
@@ -197,7 +422,7 @@ class ControlWidget(pg.LayoutWidget):
                          readonlygroup])
         self.p.addChild(gp0)
 
-        gp1 = pTypes.GroupParameter(name='Laser control')
+        gp1 = pTypes.GroupParameter(name='Laser control old')
         self.laser_startup = Parameter.create(name='Startup', type='action')
         self.laser_current = Parameter.create(
             name='Current',
@@ -224,7 +449,7 @@ class ControlWidget(pg.LayoutWidget):
                          self.tec_state,
                          self.tec_volt_word,
                          self.tec_resistance])
-        self.p.addChild(gp1)
+        # self.p.addChild(gp1)
 
         gp2 = pTypes.GroupParameter(name='Magnetic field current source')
         self.mag_current = Parameter.create(name='Current', type='float',
@@ -234,7 +459,7 @@ class ControlWidget(pg.LayoutWidget):
         self.p.addChild(gp2)
 
         self.lockon = Parameter.create(name='Laser lock ON', type='action')
-        self.p.addChild(self.lockon)
+        # self.p.addChild(self.lockon)
 
         gp3 = pTypes.GroupParameter(name='Scope')
         self.scope_state = Parameter.create(name='Acquisition', type='bool',
@@ -249,18 +474,61 @@ class ControlWidget(pg.LayoutWidget):
         self.addWidget(t,row=0, col=0)
 
         self.p.sigTreeStateChanged.connect(self.change)
-        self.startup.sigActivated.connect(self.mac.startup)
+        # self.startup.sigActivated.connect(self.mac.startup)
         self.lockon.sigActivated.connect(self.mac.lock)
         self.set_all_regesiters.sigActivated.connect(
             self.mac.adf.send_all_reg)
         self.laser_startup.sigActivated.connect(self.mac.lascursour.startup)
-
+        # Carlos RIVERA:
+        self.btn_start_ramp.sigActivated.connect(self.mac.starts_ramp)
+        self.btn_start_laser_lock.sigActivated.connect(self.mac.lock_laser)
+        self.btn_start_quartz_lock.sigActivated.connect(self.mac.lock_quartz) # Check scan quartz
         def clear_error_sig_plot():
             self.sreader.error_sig_buffer.clear()
 
         self.clear_error_sig_action.sigActivated.connect(clear_error_sig_plot)
 
     def change(self, param, changes):
+        for param, change, data in changes:
+            # Group 1: Laser control
+            if param is self.set_laser_frequency:
+                self.mac.lascursour.current= param.value()
+            elif param is self.set_laser_temperature:
+                pass
+            # Sub-group 1: Ramp
+            elif param is self.set_ramp_start:
+                self.mac.start_current = misc.current_to_word(param.value())
+            elif param is self.set_ramp_end:
+                self.mac.end_current= misc.current_to_word(param.value())
+            elif param is self.set_ramp_samples:
+                self.mac.number_samples=param.value()
+            # Group 2: Laser lock
+            elif param is self.set_laser_lock_initial_value:
+                self.mac.laser_lock_initial_value = misc.current_to_word(param.value())
+            elif param is self.set_laser_mod_width:
+                self.mac.laser_mod_width = misc.current_to_word(param.value()*1000/2)
+            elif param is self.set_laser_kp:
+                self.mac.laser_kp=param.value()
+            elif param is self.set_laser_ki:
+                pass
+            elif param is self.set_laser_kd:
+                pass
+            # Group 3: Quartz lock
+            elif param is self.set_quartz_lock_initial_value:
+                self.mac.quartz_lock_initial_value = param.value() #Check! Conversion pending
+            elif param is self.set_quartz_mod_width:
+                self.mac.laser_mod_width = param.value() #Check! Conversion pending
+            elif param is self.set_quartz_kp:
+                self.mac.quartz_kp=param.value()
+            elif param is self.set_quartz_ki:
+                self.mac.quartz_ki=param.value()
+            elif param is self.set_quartz_kd:
+                self.mac.quartz_kd=param.value()
+            # Group 4: CPT lock (Read only, do not change)
+            # Group 5: Others (Pending)
+
+            
+        return
         for param, change, data in changes:
             if param is self.set_frequency:
                 self.mac.adf.frequency = param.value()
@@ -303,10 +571,14 @@ class LiveGraphWidget(pg.GraphicsLayoutWidget):
         self.sreader = serial_reader
         self.p1 = self.addPlot()
         self.p1.showGrid(x=False, y=True, alpha=0.8)
+        self.p1.setLabel(axis='left', text='Laser current (mA)')
+        self.p1.setLabel(axis='bottom', text='Time (s)')
         self.curve1 = self.p1.plot(pen=pg.mkPen((0, 255, 155,255)))
         self.nextRow()
         self.p2 = self.addPlot()
         self.p2.showGrid(x=False, y=True, alpha=0.8)
+        self.p2.setLabel(axis='left', text='Quartz frequency (Hz)')
+        self.p2.setLabel(axis='bottom', text='Time (s)')
         self.curve2 = self.p2.plot(pen=pg.mkPen((0, 155, 255,255)))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
@@ -315,12 +587,30 @@ class LiveGraphWidget(pg.GraphicsLayoutWidget):
 
     def update(self):
         if self.sreader:
+            y_laser=self.sreader.current_buffer.get_data()
+            y_quartz=self.sreader.quartzword_buffer.get_data()
+            # Modify received data
+            try:
+                for [i,value] in enumerate(y_laser):
+                    ## Control outliers
+                    # Correction of overflow
+                    if(value<20000 or value>65535):
+                        y_laser[i]=65535+y_laser[i]
+                    # Correct x axis outliers:
+                    # for [i,value] in enumerate(x):
+                    #     if(value<0 or value>1.5):
+                    #         x[i]=x[i-1]
+                    ## Convert machine units to physical units
+                    # x[i]=misc.word_to_current(x[i])
+                    y_laser[i]=misc.word_to_current(y_laser[i])
+            except:
+                pass
             # Current graph
-            self.curve1.setData(y=self.sreader.current_buffer.get_data())
+            self.curve1.setData(y=y_laser)
             # Update marker for current locking frequency
 
             # Quartz graph
-            self.curve2.setData(y=self.sreader.quartzword_buffer.get_data())
+            self.curve2.setData(y=y_quartz)
 
     def start_timer(self):
         self.timer.start(100)
@@ -337,15 +627,42 @@ class ErrorGraphWidget(pg.GraphicsLayoutWidget):
         self.sreader = serial_reader
         self.p1 = self.addPlot()
         self.p1.showGrid(x=True, y=True, alpha=0.8)
+        self.p1.setLabel(axis='left', text='Error signal')
+        self.p1.setLabel(axis='bottom', text='Quartz frequency (Hz)')
         self.curve1 = self.p1.plot(pen=pg.mkPen((0, 255, 155,255)))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
         self.start_timer()
 
     def update(self):
-        if self.sreader:
+        if self.sreader:            
             y = self.sreader.error_sig_buffer.get_data()
             x = self.sreader.error_sig_buffer.get_times()
+
+            # Sorting arrays based on x axis to avoid lines going from left to right
+            x_ind = x.argsort()
+            x = x[x_ind[::-1]]
+            y = y[x_ind[::-1]]
+            # Modify received data
+            try:
+                for [i,value] in enumerate(y):
+                    ## Control outliers
+                    # Correction of overflow
+                    # if(value<20000 or value>65535):
+                    #     y[i]=65535+y[i]
+                    # Correction of outliers
+                    if(value>100 or value<-100):
+                        y[i]=y[i-1]
+                    # Correct x axis outliers:
+                    # for [i,value] in enumerate(x):
+                    #     if(value<0 or value>1.5):
+                    #         x[i]=x[i-1]
+                    ## Convert machine units to physical units
+                    # x[i]=misc.word_to_current(x[i])
+                    # y[i]=misc.word_to_voltage(y[i])
+            except:
+                pass
+
             n = min(len(x), len(y))
             if n > 1:
                 self.curve1.setData(x=x[0:n], y=y[0:n])
@@ -364,68 +681,97 @@ class AbsorptionGraphWidget(pg.GraphicsLayoutWidget):
         self.sreader = serial_reader
         self.p1 = self.addPlot()
         self.p1.showGrid(x=True, y=True, alpha=0.8)
+        self.p1.setLabel(axis='left', text='Photodiode voltage (V)')
+        self.p1.setLabel(axis='bottom', text='Laser current (mA)')
         self.curve1 = self.p1.plot(pen=pg.mkPen((0, 255, 155,255)))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
         self.start_timer()
         # Creating marker to indicate maximum absorption
         self.text = pg.TextItem(html='<div style="text-align: center"><span style="color: #FFF;">Maximum absorption at</span><br><span style="color: #FF0; font-size: 12pt;">0</span></div>', anchor=(-0.2,1.3), border='w', fill=(0, 0, 255, 100))
-        self.text.setPos(0,0)
         self.p1.addItem(self.text)
+        self.text.setPos(1,1)
         self.arrow = pg.ArrowItem(angle=-45)
-        self.arrow.setPos(0,0)
         self.p1.addItem(self.arrow)
+        self.arrow.setPos(1,1)
         # Marker 2:
         self.curvePoint = pg.CurvePoint(self.curve1)
         self.p1.addItem(self.curvePoint)
-        self.text2 = pg.TextItem("test", anchor=(0.5, -1.0))
+        self.text2 = pg.TextItem("test", anchor=(0, -1.0))
         self.text2.setParentItem(self.curvePoint)
-        self.arrow2 = pg.ArrowItem(angle=90)
+        self.arrow2 = pg.ArrowItem(angle=45)
         self.arrow2.setParentItem(self.curvePoint)
+        # Marker 3:
+        self.curvePoint2 = pg.CurvePoint(self.curve1)
+        self.p1.addItem(self.curvePoint2)
+        self.text3 = pg.TextItem("test", anchor=(1, -1.0))
+        self.text3.setParentItem(self.curvePoint2)
+        self.arrow3 = pg.ArrowItem(angle=135)
+        self.arrow3.setParentItem(self.curvePoint2)
+        # Marker 3:
+        # self.arrow3 = pg.ArrowItem(angle=90)
+        # self.p1.addItem(self.arrow3)
+        # self.arrow3.setPos(1,1)
 
     def update(self):
         if self.sreader:
             y = self.sreader.absorption_sig_buffer.get_data()
             x = self.sreader.absorption_sig_buffer.get_times()
-            m = self.sreader.marker.get_data()
+            m_x = self.sreader.marker.get_data()
             n = min(len(x), len(y))
             if n > 1:
                 # Sorting arrays based on x axis to avoid lines going from left to right
                 x_ind = x.argsort()
                 x = x[x_ind[::-1]]
                 y = y[x_ind[::-1]]
-                # Control outliers
+                # Modify received data
                 try:
-                    # Convert overflow into saturation
                     for [i,value] in enumerate(y):
+                        ## Control outliers
+                        # Correction of overflow
                         if(value<20000 or value>65535):
                             y[i]=65535+y[i]
-                    # Correct x axis outliers:
-                    for [i,value] in enumerate(x):
-                        if(value<29000 or value>34000):
-                            x[i]=x[i-1]
+                        # Correct x axis outliers:
+                        # for [i,value] in enumerate(x):
+                        #     if(value<0 or value>1.5):
+                        #         x[i]=x[i-1]
+                        ## Convert machine units to physical units
+                        x[i]=misc.word_to_current(x[i])
+                        y[i]=misc.word_to_voltage(y[i])
                 except:
                     pass
+                
                 self.curve1.setData(x=x[0:n], y=y[0:n])
                 # Updating marker position and text
                 x_of_max=x[np.where(y == y.min())[0][0]]
                 self.text.setPos(x_of_max, y.min())
-                self.text.setHtml('<div style="text-align: right"><span style="color: #FFF;">Maximum absorption at:</span><br><span style="color: #FF0; font-size: 12pt;">{}</span></div>'.format(str(x_of_max)))
+                self.text.setHtml('<div style="text-align: right"><span style="color: #FFF;">Maximum absorption at:</span><br><span style="color: #FF0; font-size: 12pt;">{:.3f} mA, {:.3f} V</span></div>'.format(x_of_max,y.min()))
 
                 ## Draw an arrowhead next to the text box
                 self.arrow.setPos(x_of_max, y.min())
 
                 ## Control the animated arrow and text that track the curve
-                index = np.where(y == y.min())[0][0]
-                self.curvePoint.setPos(float(index)/(x.size-1))
-                # self.text2.viewRangeChanged()
-                self.text2.setText('[%0.1f, %0.1f]' % (x[index], y[index]))
+                # index = np.where(y == y.min())[0][0]
+                # self.curvePoint.setPos(float(index)/(x.size-1))
+                # # self.text2.viewRangeChanged()
+                # self.text2.setText('[%0.1f, %0.1f]' % (x[index], y[index]))
             
             # Move locking frequency marker based on global variable (Value received at "l" function)
-            # try:
-            #     self.arrow.setPos(m, y.min())
-            # except:
-            #     pass
+            if(len(m_x)>1):
+                try:
+                    # Convert x position to current
+                    m_x=misc.word_to_current(m_x)
+                    # Change position and text of arrow 1
+                    index = np.where(x < m_x[0])[0][0]
+                    self.curvePoint.setPos(float(index)/(x.size-1))
+                    self.text2.setText('[i={:0.3f} mA, v={:0.3f} V]'.format(x[index], y[index]))
+                    # Change position and text of arrow 2
+                    index = np.where(x < m_x[1])[0][0]
+                    self.curvePoint2.setPos(float(index)/(x.size-1))
+                    self.text3.setText('[i={:0.3f} mA, v={:0.3f} V]'.format(x[index], y[index]))
+                    return
+                except:
+                    pass
                 
                 
                 
@@ -456,7 +802,7 @@ class MyWindow(QtGui.QMainWindow):
         self.setCentralWidget(area)
 
         d1 = Dock("Controls", size=(400, 1))
-        d2 = Dock("Time plots", size=(1000, 1))
+        d2 = Dock("Quartz frequency        |        Laser current", size=(1000, 1))
         d3 = Dock("Console", size=(1, 1))
         d4 = Dock("Error signal", size=(1000, 1))
         d5 = Dock("Absorption signal", size=(1000, 1))
@@ -571,6 +917,6 @@ if args.port:
     port = args.port
 else:
     # port = ask_for_port()
-    port = "COM3" # ask_for_port() #testing, com port = COM6
+    port = "COM6" # ask_for_port() #testing, com port = COM6
 
 main(port)
