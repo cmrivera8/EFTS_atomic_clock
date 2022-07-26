@@ -1,0 +1,2 @@
+Network port phase output rate: 1000 samples/sec.
+

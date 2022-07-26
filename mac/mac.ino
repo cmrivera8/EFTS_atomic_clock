@@ -22,7 +22,7 @@ const int CS_mag = 8;
 const int ButtonPin = 9;
 const int ADC_DRDY = 11;
 const int CS_ADC = 12;
-const int Lock_trigger = 61;
+const int Lock_trigger = 61;    //  A7, apparently not connected to anything, only oscilloscope trigger purpose.
 
 int laser_lock_step = 1;         // Laser lock step
 int lock_step_cpt = 1;           // Quartz lock step
@@ -30,12 +30,12 @@ const int averages = 1;          // Number of averages before each laser lock st
 int init_VCSEL_current = 30000;  // Laser current word after initial startup ->50978
 int quartz_init = 10000;   // Initial quartz dac word -1500 avec synthese j
 float kp = 0.4;
-float ki = 0;
+float ki = 0.01;
 float kd = 0;
-float kpl = 0.2;
+float kpl = 0.7;
 unsigned int scanStart = 24000;  //---------------------
 unsigned int scanEnd;
-unsigned int scanSamples;
+unsigned int scanSamples = 300;
 
 unsigned int scanQuartzStart=0;
 unsigned int scanQuartzEnd = 41530;
@@ -47,7 +47,7 @@ int RF_step = 30;
 
 void setup() {
   pinMode(CS_ADF4158, OUTPUT);
-  pinMode(61, OUTPUT);
+  pinMode(Lock_trigger, OUTPUT);
   pinMode(TXDATA, OUTPUT);
   pinMode(CS_DAC_quartz, OUTPUT);
   pinMode(CS_DAC_TEC, OUTPUT);
@@ -68,12 +68,15 @@ void setup() {
   digitalWrite(TXDATA, LOW);
   
   SPI.begin();
- // SPI.setClockDivider(SPI_CLOCK_DIV128);                // Lower the SPI transmision speed in case of long signal wires
+  SPI.setClockDivider(SPI_CLOCK_DIV128);                // Lower the SPI transmision speed in case of long signal wires
   Serial.begin(115200);  
   print_title();
   print_menu();
   //analogWriteResolution(12);   // ???????? fonction pas défini
   //analogWrite(DAC1, attenuator_word);  // ???????? fonction pas défini
+
+  // Set the magnetic field current and Quartz VCO at 0 by default:
+  Show_CPT();
   return;
     //-------------initial value vcsel--------------erase this block if problem
    byte byte1 = (init_VCSEL_current >> 8);
@@ -311,6 +314,7 @@ void ADF4158_Set_CPT() {        // Sets PLL values to show CPT signal
   ADF4158_Write(0x783204);      // R4: Set the clock divider mode to "ramp divider" and the divider value to 100.
   ADF4158_Write(0x43);          // R3: Set the ramp to continuous sawtooth.
   ADF4158_Write(0x40800A);      // R2: i charge pump (cp) set to 0.35mA /cyrus (CR: Set current setting to 0.31, r-counter divide ratio to 1 and clock divider to 1.)
+  // return;
   ADF4158_Write(0x1280001);     // R1: PRESCEDENT FFF8001 (CR: This register sets the LSb of the FRAC value)
   ADF4158_Write(0xF8E5D0A8);    // R0: pll setting= Muxout ramp Status on 0xF8E5D0A8 (CR: Set the MSb of the FRAC value and INT value)
 }
@@ -329,6 +333,7 @@ void ADF4158_Set_CPT_lock(){
   ADF4158_Write(0x180104);    // R4: Set the clock divider mode to "ramp divider" and the divider value to 2.
   ADF4158_Write(0x143);       // R3: Set the ramp to continuous sawtooth (FSK enabled).
   ADF4158_Write(0x40800A);    // R2: i charge pump (cp) set to 0.35mA /cyrus (CR: Set current setting to 0.31, r-counter divide ratio to 1 and clock divider to 1.)
+  // return;
   ADF4158_Write(0x80F0001);   //OxDDA8001 ces 2 registres**  fonctionne bien avec la synthese J (CR: )
   ADF4158_Write(0xE5D190);    //0xE5D128 ne pas oublier ce registre** MSB FRAC (CR: Set MUXOUT CONTROL to "THREE-STATE OUTPUT" and the MSb of the FRAC value and INT value)
 }
@@ -359,12 +364,20 @@ void TEC_off() {                                         // Turns LTC1923 off by
 
 
 void toggle_TXDATA(){                                    // Toggles ADF4158 TXDATA pin
-  digitalWrite(TXDATA,(!digitalRead(TXDATA)));
+  digitalWrite(TXDATA,(!digitalRead(TXDATA))); //pin 4 of Arduino
+  // This pin is connected to "txdata" of the synthesizer 
+  // which makes it operate Frequency Shift Keying (FSK) mode:
+  // Logic 0 is represented by a wave at a specific frequency, 
+  // and logic 1 is represented by a wave at a different frequency. 
+  // The distance between logic 0 and logic 1 is known as the deviation or shift point.
+  // The central frequency is the current Quartz frequency defined by "CS_DAC_quartz"
+  // and the modulation to calculate the error signal is 84 Hz around it.
+  // Page: 26
 }
 
 
 void toggle_Trigger(){
-  digitalWrite(Lock_trigger,(!digitalRead(Lock_trigger)));
+  digitalWrite(Lock_trigger,(!digitalRead(Lock_trigger))); //pin 61 = A7 (Analog)
 }
 
 
@@ -379,12 +392,16 @@ void VCSEL_startup(){                                    // VCSEL slow-start, sl
 
 // case '2':
 void Show_CPT(){
-  DAC_load(CS_DAC_quartz, quartz_init);
+  ADF4158_Set_CPT_lock();
+  // ADF4158_Set_CPT();
+  // toggle_TXDATA();
+  return;
+  DAC_load(CS_DAC_quartz, 0); //quartz_init
   VCSEL_startup();                                      // Ramp-up VCSEL current
   TEC_DAC_load(TEC_WORD);                               // Set VCSEL TEC Word
   TEC_on();
   ADF4158_Set_CPT();
-  DAC_load(CS_mag, 10000);                              // Sets magnetic field word to 10000
+  DAC_load(CS_mag, 0);                              // Sets magnetic field word to 10000
 }
 
 int ADC_read(){                                          // Reads the ADC value, returns a 16-bit int (two's complement!)
@@ -494,7 +511,7 @@ void NewLaserLock(){
         break;
       }
     }
-    digitalWrite(Lock_trigger,(!digitalRead(61)));
+    digitalWrite(Lock_trigger,(!digitalRead(Lock_trigger)));
     right_measurement=previous_DAC_val + laser_lock_step;
     left_measurement=previous_DAC_val - laser_lock_step;
 
@@ -555,7 +572,7 @@ void LaserLock(){
   int flag = 1;
   unsigned int new_DAC_val;
   while(ButtonState == LOW){
-    digitalWrite(Lock_trigger,(!digitalRead(61)));
+    digitalWrite(Lock_trigger,(!digitalRead(Lock_trigger)));
     current_ADC_val = 0;
     for(int i =0; i < averages; i++){
       current_ADC_val += ADC_read();
@@ -605,7 +622,7 @@ void ErrorDisplay(){
     toggle_Trigger();
     toggle_TXDATA();
     val2 = ADC_read();
-    Error = val1-val2;
+    Error = val1-val2; // -offset
     ErrorSum += Error;
     ErrorDiff = Error - previousError;
     NewVal = (previous_quartz_val - (kp*Error + ki*ErrorSum + kd*ErrorDiff));
@@ -638,26 +655,32 @@ void LaserScan(unsigned int startVal,unsigned int endVal,unsigned int nSamples){
   int ButtonState = 0;
   ButtonState = digitalRead(ButtonPin);
   int sample_range=endVal-startVal;
-  int cycles_per_sample = 3; // aprox: 1 second refresh rate
+  int cycles_per_sample = 1; // aprox: 1 second refresh rate
   int enable_measurement=0;
   printDebug("Scan ON");
   while(ButtonState == LOW){
     if(Serial.available()){
-      if((char)Serial.read()=='x'){
+      char received=Serial.read();
+      if(received=='x'){
         break;
+      }
+      // To modify the synthesizer register with the ramp on:
+      else if(received=='4'){
+        ADF4158_Write(Serial.parseInt());
       }
     }
     int old_i = 0;
-    toggle_Trigger();
+    // toggle_Trigger(); //Not used
+    //Set initial value and wait for the signal to stabilize, provides better plot
+    DAC_load(CS_VCSEL, startVal);
+    delayMicroseconds(3000);  
     for(unsigned int i = startVal; i < endVal; i += 1){ //variable init scanstart = 45000
-      DAC_load(CS_VCSEL, i);
-            
+      DAC_load(CS_VCSEL, i); // This takes 13.58 us
       if (i-old_i>sample_range/nSamples && enable_measurement){
-        delayMicroseconds(3000);
-        Serial.println("A "+String(i)+" "+String(ADC_read()));
+        Serial.println("A "+String(i)+" "+String(ADC_read())); // This line takes 95 us
         old_i = i;        
       }else{
-        delayMicroseconds(10);  
+        delayMicroseconds(95);  
       }
     }
     enable_measurement=countCycles(1,cycles_per_sample);
@@ -670,33 +693,31 @@ void LaserScan(unsigned int startVal,unsigned int endVal,unsigned int nSamples){
 void QuartzScan(unsigned int startVal,unsigned int endVal){
   ADC_startup();
   DAC_load(CS_DAC_quartz, 0);
-  ADF4158_Set_CPT_lock();
+  // ADF4158_Set_CPT_lock(); //testing
   digitalWrite(Lock_trigger, LOW);
   digitalWrite(TXDATA, LOW);
   printDebug("Quartz Scan ON");
-  // int ButtonState = 0;
-  // while(ButtonState == LOW){
-    for(unsigned int i = startVal; i < endVal; i += 10){ // 0 to 41530, step 10
-      // ButtonState = digitalRead(ButtonPin); 
-      // if(ButtonState == HIGH){break;}
-      if(Serial.available()){
-        if((char)Serial.read()=='x'){
-          break;
-        }
+  for(unsigned int i = startVal; i < endVal; i += 10){ // 0 to 41530, step 10
+    if(Serial.available()){
+      if((char)Serial.read()=='x'){
+        break;
       }
-      DAC_load(CS_DAC_quartz, i);
-      // delayMicroseconds(50);
-      toggle_Trigger();
-      toggle_TXDATA();
-      int val1 = ADC_read();
-      toggle_Trigger();
-      toggle_TXDATA();
-      int val2 = ADC_read();
-      int Error = val1-val2;
-      Serial.println("E "+String(i)+" "+String(Error));
     }
-    Serial.println("x"); // To indicate GUI the error measurement is complete
-    printDebug("Quartz Scan OFF");
+    DAC_load(CS_DAC_quartz, i);
+    // delayMicroseconds(50); // delay changes the modulation frequency of 420 Hz
+    // toggle_Trigger();
+    toggle_TXDATA(); // 0 ms
+    int val1 = ADC_read();
+    // toggle_Trigger();
+    toggle_TXDATA(); // 1.03 ms, complete cycle: 420 Hz
+    int val2 = ADC_read();
+    int Error = val1-val2;
+    Serial.println("E "+String(i)+" "+String(Error)); // Stream error value
+    Serial.println("C "+String(i)+" "+String(val1));  // Stream cpt signal value
+  }
+  Serial.println("x"); // To indicate GUI the error measurement is complete
+  printDebug("Quartz Scan OFF");
+  DAC_load(CS_DAC_quartz, 0); // Set quartz DAC back to 0
   // }
 }
 

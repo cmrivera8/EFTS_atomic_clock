@@ -1,0 +1,7 @@
+Reference Frequency: 10.0 MHz (auto)
+
+Avg Time (s)	Frequency (MHz)
+1		9.9999280028522  
+10		9.99992800377150 
+100		9.999928002183417
+

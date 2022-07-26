@@ -1,0 +1,5 @@
+function result=word_to_voltage(value)
+    p1=0.000030294604198194861416565740186435;
+    p2=2.4538899853718616483888581569772;
+    result=p1*value+p2;
+end

@@ -1,0 +1,20 @@
+Time Constant: Infinite
+Lower Integration	Integrated Phase	Integrated Phase
+Frequency (Hz)		Noise without		Noise with
+			spurs (rad)		spurs (rad)
+
+0.01	2.8e-01			2.8e-01
+
+0.1	8.5e-02			8.5e-02
+
+1	2.3e-02			2.3e-02
+
+10	4.1e-03			4.1e-03
+
+100	3.0e-04			3.2e-04
+
+1000	1.1e-04			1.2e-04
+
+10000	1.1e-04			1.1e-04
+
+

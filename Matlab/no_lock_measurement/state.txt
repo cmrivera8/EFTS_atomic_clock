@@ -1,0 +1,2 @@
+Collecting (4h 21m)
+Time Constant: Infinite

@@ -102,6 +102,7 @@ In function "void ADF4158_Set_CPT_lock()":
 RAMP DELAY: 0, Disabled
 CONTROL BITS: 111, select DELAY REGISTER (R7)
 Note: Delay disabled
+Decimal value of register: 7
 
 >> "ADF4158_Write(0x800006);"
 1 00000000000000000000 110
@@ -109,6 +110,7 @@ STEP SEL: 1, STEP WORD 2
 20-BIT STEP WORD: 0, 0
 CONTROL BITS: 110, select STEP REGISTER (R6)
 Note: Setting the number of steps in ramp 2 to 0.
+Decimal value of register: 8388614
 
 >> "ADF4158_Write(0x6);"
 0 00000000000000000000 110
@@ -116,6 +118,7 @@ STEP SEL: 0, STEP WORD 1
 20-BIT STEP WORD: 0, 0
 CONTROL BITS: 110, select STEP REGISTER (R6)
 Note: Setting the number of steps in ramp 1 to 0.
+Decimal value of register: 6
 
 >> "ADF4158_Write(0x800005);"
 1 0000 0000000000000000 101
@@ -124,6 +127,7 @@ DEV SEL: 1, DEV WORD 2
 16-BIT DEVIATION WORD: 0, 0
 CONTROL BITS: 101, select DEVIATION REGISTER (R5)
 Note: Setting the deviation of ramp 2 to 0 (disable it).
+Decimal value of register: 8388613
 
 >> "ADF4158_Write(0x200695);"
 0 0100 0000000011010010 101
@@ -132,6 +136,7 @@ DEV SEL: 0, DEV WORD 1
 16-BIT DEVIATION WORD: 11010010, 0d210
 CONTROL BITS: 101, select DEVIATION REGISTER (R5)
 Note: Setting the deviation of ramp 1 to "210" and offset "4". (Explanation pending)
+Decimal value of register: 2098837
 
 >> "ADF4158_Write(0x180104);"
 00 11 000000000010 0000 100
@@ -140,6 +145,7 @@ CLK DIV MODE: 0b11, RAMP DIVIDER
 12-BIT CLK DIVIDER VALUE: 10, 0d2  (in software: "Up ramp CLK2")
 CONTROL BITS: 100, select TEST REGISTER (R4)
 Note: Set the clock divider mode to "ramp divider" and the divider value to 2.
+Decimal value of register: 1573124
 
 >> "ADF4158_Write(0x143);"
 00 0 1 0 1 0 0 0 011
@@ -153,6 +159,7 @@ CP THREE-STATE: 0, Disabled
 COUNTER RESET: 0, Disabled
 CONTROL BITS: 011, select FUNCTION REGISTER (R3)
 Note: Set the ramp to continuous sawtooth (FSK enabled).
+Decimal value of register: 323
 
 >> "ADF4158_Write(0x40800A);"
 0000 0 1 0 0 00001 000000000001 010
@@ -165,6 +172,7 @@ REFERENCE DOUBLE DBB: 0, Disabled
 12-BIT CLK1 DIVIDER: 1, 0d1
 CONTROL BITS: 010, select R-DIVIDER REGISTER (R2)
 Note: Set current setting to 0.31, r-counter divide ratio to 1 and clock divider to 1.
+Decimal value of register: 4227082
 
 >> "ADF4158_Write(0x80F0001);"
 1000000011110 000000000000 001
@@ -172,6 +180,7 @@ Note: Set current setting to 0.31, r-counter divide ratio to 1 and clock divider
 RESERVED: 0, 0
 CONTROL BITS: 001, select LSB FRAC REGISTER (R1)
 Note: Set the LSb of the FRAC value
+Decimal value of register: 135200769
 
 >> "ADF4158_Write(0xE5D190);"
 0 0000 000111001011 101000110010 000
@@ -181,6 +190,7 @@ MUXOUT CONTROL: 0000, THREE-STATE OUTPUT
 12-BIT MSB FRACTIONAL VALUE: 101000110010, 0d2610
 CONTROL BITS: 000, select FRAC/INT REGISTER (R0)
 Note: Set MUXOUT CONTROL to "THREE-STATE OUTPUT" and the MSb of the FRAC value and INT value
+Decimal value of register: 15061392
 
 THE FRAC VALUE IS MADE UP OF THE 12-BIT MSB STORED INREGISTER R0, AND THE 13-BIT LSB REGISTER STORED INREGISTER R1. FRAC VALUE = 13-BIT LSB + 12-BIT MSB × 2^13
 Complete value: 0b1010001100101000000011110, 0x146501E, 0d21385246

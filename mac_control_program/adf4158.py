@@ -193,6 +193,8 @@ class Adf4158():
         self._lsb_frac_value = f_lsb
         logging.debug("R1 %r", hex(self.R1()))
         logging.debug("R0 %r", hex(self.R0()))
+        print("R1 %r", hex(self.R1()))
+        print("R0 %r", hex(self.R0()))
         self.send_reg(self.R1())
         self.send_reg(self.R0())
 

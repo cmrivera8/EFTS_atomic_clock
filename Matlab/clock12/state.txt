@@ -1,0 +1,2 @@
+Collecting (30m)
+Time Constant: Infinite

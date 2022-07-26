@@ -1,0 +1,7 @@
+Current:
+Input: Frequency 10.0 MHz Amplitude 14 dBm
+Reference: Frequency 10.0 MHz Amplitude 9 dBm
+Last Collection:
+Input: Frequency 10.0 MHz Amplitude 14 dBm
+Reference: Frequency 10.0 MHz Amplitude 9 dBm
+

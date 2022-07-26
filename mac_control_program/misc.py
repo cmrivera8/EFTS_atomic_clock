@@ -147,8 +147,10 @@ def current_to_word(value):
     return int((value/2.5)*2**16)
 
 def word_to_voltage(value):
-    p1=0.000031126330400437179739270288081343
-    p2=0.46047937162911467545711730053881
+    # p1=0.000031126330400437179739270288081343
+    # p2=0.46047937162911467545711730053881
+    p1=0.000030294604198194861416565740186435
+    p2=2.4538899853718616483888581569772
     return p1*value+p2
 
 def voltage_to_word(value):
@@ -157,7 +159,11 @@ def voltage_to_word(value):
     return (value-p2)/p1
 
 def word_to_frequency(value):
-    pass
+    p1=1.625
+    p2=0
+    return p1*value+p2
 
 def frequency_to_word(value):
-    pass
+    p1=1.625
+    p2=0
+    return (value-p2)/p1

@@ -10,6 +10,7 @@ brief     MAC device drivers.
 import time
 import logging
 import serial
+import misc
 #import subcomponent as sc
 from adf4158 import Adf4158
 
@@ -45,7 +46,7 @@ class LaserCurrentSource(SubComponent):
 
     @current.setter
     def current(self, value):
-        assert 0 <= value < 2
+        assert 0 <= value < 1.7
         self._current_word = int((value/2.5)*2.**16)
         self.parent.send("9 " + str(self._current_word))
 
@@ -53,7 +54,7 @@ class LaserCurrentSource(SubComponent):
 # ============================================================================
 class MagFieldCurrentSource(SubComponent):
 
-    _current_word = 10000  # 1.7 mA
+    _current_word = 0 #10000  # 1.7 mA
 
     @property
     def current(self):
@@ -118,18 +119,23 @@ class Mac():
         self.magcursour = MagFieldCurrentSource(self)
         self.lastecctrl = LaserTECcontroller(self)
         # Carlos RIVERA:
-        # Sub-group 1: Ramp
-        self.start_current=28000 # 1.0681 mA
-        self.end_current=34000 # 1.2970 mA
-        self.number_samples=200
+        # Group 1: Laser and magnetic field control
+        # Sub-group 1: Laser scan
+        self.start_current= misc.current_to_word(1.1)#28000 # 1.0681 mA
+        self.end_current= misc.current_to_word(1.2) #34000 # 1.2970 mA
+        self.number_samples=300
         # Group 2: Laser lock
-        self.laser_lock_initial_value=31457 #1.2 mA
-        self.laser_mod_width=1 # 38.147 nA = 1 machine unit
-        self.laser_kp=0.2
+        self.laser_lock_initial_value=misc.current_to_word(1.298) #31457 #1.2 mA
+        self.laser_mod_width=misc.current_to_word(114.441e-6) # 38.147 nA = 1 machine unit
+        self.laser_kp=0.07
         # Group 3: Quartz lock
-        self.quartz_lock_initial_value=10000 #Check! Conversion pending
+        # Sub-group 1: Error signal plot
+        self.start_quartz=misc.frequency_to_word(0)
+        self.end_quartz=misc.frequency_to_word(60000)
+        # Sub-group 2: CPT lock
+        self.quartz_lock_initial_value=misc.frequency_to_word(50000)
         self.quartz_kp=0.4
-        self.quartz_ki=0
+        self.quartz_ki=0.01
         self.quartz_kd=0
     def connect(self, port):
         self.ser.port = port
@@ -181,38 +187,66 @@ class Mac():
     def startup(self):
         logging.info("Start up sequence")
         self.send("2")
-        time.sleep(1) # 1 second
+        time.sleep(0.25) # 0.25 second
         # self.send("t 29000 34000 5000 s")
 
-    def starts_ramp(self):
-        self.startup()
+    def start_ramp(self):
+        # self.startup()
         logging.info("Start ramp of the laser")
         command="t {} {} {} s".format(self.start_current,self.end_current,self.number_samples)
-        print(command)
+        # print(command)
         self.send(command)
     
     def lock_laser(self):
         logging.info("Start lock of the laser")
-        command = "a {} {} {} {}".format(self.quartz_kp,self.quartz_ki,self.quartz_kd,self.laser_kp)
-        self.send(command)
-        command = "i {} {} l".format(self.laser_lock_initial_value,self.laser_mod_width)
+        self.update_pid()
+        self.update_laser_parameters()
+        time.sleep(0.25)
+        command = "l"
         self.send(command)
     
     def lock_quartz(self):
-        logging.info("Start lock of the quartz")
-        command = "a {} {} {} {}".format(self.quartz_kp,self.quartz_ki,self.quartz_kd,self.laser_kp)
+        logging.info("Plotting error signal")
+        self.update_pid()
+        self.update_laser_parameters()
+        self.update_quartz_scan_parameters()
+        self.update_quartz_parameters()
+        command = "b"
         self.send(command)
+
+    def lock_cpt(self):
+        logging.info("Start lock of the quartz")
+        self.update_pid()
+        self.update_laser_parameters()
+        self.update_quartz_scan_parameters()
+        self.update_quartz_parameters()
+        command = "0"
+        self.send(command)
+        
+    def update_laser_parameters(self):
         command = "i {} {}".format(self.laser_lock_initial_value,self.laser_mod_width)
         self.send(command)
-        command = "j {}".format(self.quartz_lock_initial_value)
+
+    def update_quartz_parameters(self):
+        command = "j {}".format(int(self.quartz_lock_initial_value))
+        # print(command)
         self.send(command)
-        command = "b"
+
+    def update_quartz_scan_parameters(self):
+        command = "v {} {}".format(int(self.start_quartz),int(self.end_quartz))
+        # print(command)
+        self.send(command)
+
+    def update_pid(self):
+        command = "a {} {} {} {}".format(self.quartz_kp,self.quartz_ki,self.quartz_kd,self.laser_kp)
         self.send(command)
 
     def lock(self):
         logging.info("Lock ON")
         self.send("3")
 
+    def stop_signal(self):
+        self.send("x")
 
 # ============================================================================
 if __name__=='__main__':
