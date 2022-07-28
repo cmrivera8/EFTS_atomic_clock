@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """package mac
-author    Benoit Dubois
+author    Benoit Dubois (updated by Carlos RIVERA, july 2022)
 copyright FEMTO ST, 2021
 license   GPL v3.0+
 brief     MAC device drivers.
@@ -34,11 +34,13 @@ class ScAdf4158(Adf4158, SubComponent):
 
 # ============================================================================
 class LaserCurrentSource(SubComponent):
-
-    _current_word = 23657  # 0.92mA environ pour vixar
+    _current_word = 23657  # 23657 = 0.92 mA
 
     def startup(self):
-        self.parent.send("0")
+        self.parent.send("2")
+
+    def reset(self):
+        self.parent.send("9 " + str(self._current_word))
 
     @property
     def current(self):
@@ -54,7 +56,7 @@ class LaserCurrentSource(SubComponent):
 # ============================================================================
 class MagFieldCurrentSource(SubComponent):
 
-    _current_word = 0 #10000  # 1.7 mA
+    _current_word = 0 # 0 = 0 mA and 10000 = 1.7 mA
 
     @property
     def current(self):
@@ -187,14 +189,10 @@ class Mac():
     def startup(self):
         logging.info("Start up sequence")
         self.send("2")
-        time.sleep(0.25) # 0.25 second
-        # self.send("t 29000 34000 5000 s")
 
     def start_ramp(self):
-        # self.startup()
         logging.info("Start ramp of the laser")
         command="t {} {} {} s".format(self.start_current,self.end_current,self.number_samples)
-        # print(command)
         self.send(command)
     
     def lock_laser(self):
@@ -229,12 +227,10 @@ class Mac():
 
     def update_quartz_parameters(self):
         command = "j {}".format(int(self.quartz_lock_initial_value))
-        # print(command)
         self.send(command)
 
     def update_quartz_scan_parameters(self):
         command = "v {} {}".format(int(self.start_quartz),int(self.end_quartz))
-        # print(command)
         self.send(command)
 
     def update_pid(self):

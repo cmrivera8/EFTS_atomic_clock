@@ -8,6 +8,9 @@ from collections import OrderedDict
 import numpy as np
 import yaml
 
+"""
+updated by Carlos RIVERA, july 2022
+"""
 
 class Buffer():
 
@@ -143,20 +146,17 @@ def word_to_current(value):
     return (value/2**16)*2.5
 
 def current_to_word(value):
-    # print(int((value/2.5)*2**16))
     return int((value/2.5)*2**16)
 
 def word_to_voltage(value):
-    # p1=0.000031126330400437179739270288081343
-    # p2=0.46047937162911467545711730053881
     p1=0.000030294604198194861416565740186435
     p2=2.4538899853718616483888581569772
     return p1*value+p2
 
 def voltage_to_word(value):
-    p1=0.000031126330400437179739270288081343
-    p2=0.46047937162911467545711730053881
-    return (value-p2)/p1
+    p1=0.000030294604198194861416565740186435
+    p2=2.4538899853718616483888581569772
+    return int((value-p2)/p1)
 
 def word_to_frequency(value):
     p1=1.625
@@ -166,4 +166,4 @@ def word_to_frequency(value):
 def frequency_to_word(value):
     p1=1.625
     p2=0
-    return (value-p2)/p1
+    return int((value-p2)/p1)

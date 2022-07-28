@@ -3,8 +3,18 @@
 
 """package mac
 author    J. Rutkowski, update by Benoit Dubois (add Linux compatibility)
-          2022: updated by Carlos RIVERA, added physical units to all axis and controls, absorption graph, 
-          live graph markers, editable parameters previously hard-coded and improved GUI in general.
+          2022: updated by Carlos RIVERA:
+          - Added visual controls to operate the demonstrator without console commands.
+          - Converted all machine units in the GUI (graph and controls) to physical units.
+          - Completely redesigned the "Control panel".
+          - Added the option to change the laser modulation width.
+          - Added the option to change the Quartz scan parameters (initial and final values).
+          - Added double function buttons to start/processes without relying on the physical button.
+          - Added Absorption Signal graph to monitor the output of the photodiode and not use an oscilloscope.
+          - Added titles and axis labels to all the graphs.
+          - Added "Maximum Absorption" graphic tool.
+          - Added servo loops lock state markers for Laser and Quartz graphs
+          - Added CPT signal graph
 copyright FEMTO ST, 2022
 license   GPL v3.0+
 brief     Main script of the MAC controller graphical interface.
@@ -25,7 +35,6 @@ from pyqtgraph.parametertree import Parameter, ParameterTree
 import mac_device as md
 import misc
 import numpy as np
-from datetime import datetime #testting
 # ============================================================================
 class SerialReader(pg.QtCore.QThread):
 
@@ -46,40 +55,38 @@ class SerialReader(pg.QtCore.QThread):
         self.serial = serial
 
     def run(self):
-        #self.serial.connect()
         self.running = True
-        # ramp_started = False
         while self.running:
             try:
                 line = self.serial.readline().decode('utf-8')
                 if line:
-                    if line[0] == 'D':
+                    if line[0] == 'D': # From printDebug() function
                         line = line[2:-2]
-                    elif line[0] == 'I':
+                    elif line[0] == 'I': # Time plot of the laser lock
                         self.current_buffer.append(time.time(),int(line[2:-2]))
-                    elif line[0] == 'L':
+                    elif line[0] == 'L': # Right lock modulation marker
                         self.marker1.append(time.time(),int(line[2:-2]))
-                    elif line[0] == 'M':
+                    elif line[0] == 'M': # Left lock modulation marker
                         self.marker2.append(time.time(),int(line[2:-2]))
-                    elif line[0] == 'N':
+                    elif line[0] == 'N': # Quartz frequency offset lock marker
                         self.marker3.append(time.time(),int(line[2:-2]))
-                    elif line[0] == 'Q':
+                    elif line[0] == 'Q': # Time plot of the Quartz frequency lock
                         self.quartzword_buffer.append(time.time(),int(line[2:-2]))
-                    elif line[0] == 'E':
+                    elif line[0] == 'E': # Error signal
                         dacw_error_array = line[2:-2].split(' ')
                         self.error_sig_buffer.append(int(dacw_error_array[0]),
                                                      float(dacw_error_array[1]))
-                    elif line[0] == 'C':
+                    elif line[0] == 'C': # CPT signal
                         dacw_error_array = line[2:-2].split(' ')
                         self.cpt_sig_buffer.append(int(dacw_error_array[0]),
                                                      float(dacw_error_array[1]))
-                    elif line[0] == 'A':
+                    elif line[0] == 'A': # Absorption signal
                         dacw_absorption = line[2:-2].split(' ')
                         self.absorption_sig_buffer.append(
                                 (int(dacw_absorption[0])),
                                (float(dacw_absorption[1]))
                             )
-                    elif line[0] == 'x':
+                    elif line[0] == 'x': # Process stopped signal
                         self.measurement_running=False
                     self.new_value.emit(line)
             except KeyboardInterrupt:
@@ -211,7 +218,7 @@ class ControlWidget(pg.LayoutWidget):
         #Add sub-group to main group list
         children_list.append(group_1_1)
         
-        # self.set_laser_temperature = pTypes.SimpleParameter.create( #Controlled outside
+        # self.set_laser_temperature = pTypes.SimpleParameter.create( #Not used, controlled outside.
         #     name='Temperature*',
         #     type='float',
         #     # value=self.mac.adf.total_freq_ramp,
@@ -351,7 +358,7 @@ class ControlWidget(pg.LayoutWidget):
             suffix='Hz')
         sub_children_list.append(self.set_quartz_lock_initial_value)
         #
-        # self.set_quartz_mod_width = pTypes.SimpleParameter.create(
+        # self.set_quartz_mod_width = pTypes.SimpleParameter.create( #Hardcoded at 1kHz (PLL deviation)
         #     name='Modulation width*',
         #     type='float',
         #     value=1,
@@ -476,7 +483,7 @@ class ControlWidget(pg.LayoutWidget):
 
         self.p.addChild(group_4)
 
-        ## OLD CONTROLS, not used:
+        ## OLD CONTROLS, Not used:
         gp0 = pTypes.GroupParameter(name='ADF4158 (Frequency Synthesis)')
         self.set_all_regesiters = Parameter.create(
                 name='Set registers',
@@ -538,7 +545,7 @@ class ControlWidget(pg.LayoutWidget):
                          self.clock2, self.ramp_steps,
                          readonlygroup])
         
-        self.p.addChild(gp0) # uncomment to ENABLE ADF CONTROL
+        # self.p.addChild(gp0) # uncomment to ENABLE ADF CONTROL
 
         gp1 = pTypes.GroupParameter(name='Laser control old')
         self.laser_startup = Parameter.create(name='Startup', type='action')
@@ -597,6 +604,7 @@ class ControlWidget(pg.LayoutWidget):
         self.set_all_regesiters.sigActivated.connect(
             self.mac.adf.send_all_reg)
         self.laser_startup.sigActivated.connect(self.mac.lascursour.startup)
+
         # Carlos RIVERA:
         # self.btn_start_ramp.sigActivated.connect(self.mac.start_ramp)
         self.btn_start_ramp.sigActivated.connect(self.action_start_ramp)
@@ -620,6 +628,9 @@ class ControlWidget(pg.LayoutWidget):
     def action_start_laser_lock(self):
         if("Lock laser" == self.btn_start_laser_lock.name()):
             self.btn_start_laser_lock.setName("Unlock laser")
+            #Reset previous "initial guess" laser current
+            self.mac.lascursour.reset()
+            time.sleep(1)
             self.mac.lock_laser()
         else:
             self.btn_start_laser_lock.setName("Lock laser")
@@ -827,7 +838,6 @@ class LiveGraphWidget(pg.GraphicsLayoutWidget):
     def stop_timer(self):
         self.timer.stop()
 
-
 # ============================================================================
 class ErrorGraphWidget(pg.GraphicsLayoutWidget):
 
@@ -839,7 +849,7 @@ class ErrorGraphWidget(pg.GraphicsLayoutWidget):
         self.p1.showGrid(x=True, y=True, alpha=0.8)
         self.p1.setLabel(axis='left', text='Error signal')
         self.p1.setLabel(axis='bottom', text='Quartz frequency offset (Hz)')
-        self.curve1 = self.p1.plot(pen=pg.mkPen((0, 155, 255,255))) #pen=pg.mkPen((0, 255, 155,255))) 
+        self.curve1 = self.p1.plot(pen=pg.mkPen((0, 155, 255,255)))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
         self.start_timer()
@@ -866,7 +876,6 @@ class ErrorGraphWidget(pg.GraphicsLayoutWidget):
                 for [i,value] in enumerate(x):
                     ## Convert machine units to physical units
                     x[i]=misc.word_to_frequency(x[i])
-                    # y[i]=misc.word_to_voltage(y[i]) # No units added
                     pass
             except:
                 pass
@@ -874,12 +883,9 @@ class ErrorGraphWidget(pg.GraphicsLayoutWidget):
             n = min(len(x), len(y))
             if n > 1:
                 self.curve1.setData(x=x[0:n], y=y[0:n])
-
                 # Clear buffer and change button text if measurement is over:
                 if not self.sreader.measurement_running:
                     self.control.btn_start_quartz_lock.setName("Show Error")
-                    # last_x=x
-                    # self.sreader.error_sig_buffer.clear()
             # Move locking frequency marker based on global variable (Value received at "l" function)
             if(len(m_x)>0):
                 try:
@@ -895,9 +901,6 @@ class ErrorGraphWidget(pg.GraphicsLayoutWidget):
                      # Show current locking frequency in label on control panel
                     self.control.label_quartz_lock_value.setValue(str(m_x[0]))
                 except:
-                    #out of curve, change color to red
-                    # self.text.setText('Out of scope')
-                    # self.arrow.setStyle(brush=pg.mkBrush('r'))
                     pass
         #Enable or disable autoscale
         if self.control.enable_error_autoscale:
@@ -926,7 +929,7 @@ class CPTGraphWidget(pg.GraphicsLayoutWidget):
         self.p1.showGrid(x=True, y=True, alpha=0.8)
         self.p1.setLabel(axis='left', text='Photodiode voltage (V)')
         self.p1.setLabel(axis='bottom', text='Quartz frequency offset (Hz)')
-        self.curve1 = self.p1.plot(pen=pg.mkPen((0, 155, 255,255))) #pen=pg.mkPen((0, 255, 155,255))) 
+        self.curve1 = self.p1.plot(pen=pg.mkPen((0, 155, 255,255)))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
         self.start_timer()
@@ -938,13 +941,6 @@ class CPTGraphWidget(pg.GraphicsLayoutWidget):
         self.text.setParentItem(self.curvePoint)
         self.arrow = pg.ArrowItem(angle=90)
         self.arrow.setParentItem(self.curvePoint)
-
-        # self.text =pg.TextItem(" ", anchor=(0, -1.0))
-        # self.p1.addItem(self.text)
-        # self.text.setPos(1,1)
-        # self.arrow = pg.ArrowItem(angle=90)
-        # self.p1.addItem(self.arrow)
-        # self.arrow.setPos(0,0)
 
     def update(self):
         if self.sreader:            
@@ -968,12 +964,9 @@ class CPTGraphWidget(pg.GraphicsLayoutWidget):
             n = min(len(x), len(y))
             if n > 1:
                 self.curve1.setData(x=x[0:n], y=y[0:n])
-
                 # Clear buffer and change button text if measurement is over:
                 if not self.sreader.measurement_running:
                     self.control.btn_start_quartz_lock.setName("Show Error")
-                    # last_x=x
-                    # self.sreader.error_sig_buffer.clear()
             # Move locking frequency marker based on global variable (Value received at "l" function)
             if(len(m_x)>0):
                 try:
