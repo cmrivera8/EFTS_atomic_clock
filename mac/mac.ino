@@ -284,9 +284,9 @@ void TEC_DAC_load(unsigned int value) {                  // Loads data to LTC165
   SPI.transfer(byte1);
   SPI.transfer(byte2);
   digitalWrite(CS_DAC_TEC, HIGH);
-  Serial.print("D DAC word: ");
-  Serial.print(byte1, BIN);
-  Serial.println(byte2, BIN);
+  // Serial.print("D DAC word: ");
+  // Serial.print(byte1, BIN);
+  // Serial.println(byte2, BIN);
 }
 
 
