@@ -357,6 +357,14 @@ class ControlWidget(pg.LayoutWidget):
             decimals=6,
             suffix='Hz')
         sub_children_list.append(self.set_quartz_lock_initial_value)
+        #Textbox: Frequency offset
+        self.set_quartz_frequency_offset = pTypes.SimpleParameter.create(
+            name='Frequency offset    ',
+            type='int',
+            value=0,
+            step = 1,
+            decimals=6)
+        sub_children_list.append(self.set_quartz_frequency_offset)
         #
         # self.set_quartz_mod_width = pTypes.SimpleParameter.create( #Hardcoded at 1kHz (PLL deviation)
         #     name='Modulation width*',
@@ -714,6 +722,9 @@ class ControlWidget(pg.LayoutWidget):
             elif param is self.set_quartz_lock_initial_value:
                 self.mac.quartz_lock_initial_value = misc.frequency_to_word(param.value()) 
                 self.mac.update_quartz_parameters()
+            elif param is self.set_quartz_frequency_offset:
+                self.mac.quartz_frequency_offset = param.value()
+                self.mac.update_quartz_parameters()
             # elif param is self.set_quartz_mod_width:
                 # self.mac.laser_mod_width = param.value() #Check! Conversion pending
             elif param is self.set_quartz_kp:
@@ -890,8 +901,8 @@ class ErrorGraphWidget(pg.GraphicsLayoutWidget):
             if(len(m_x)>0):
                 try:
                     # Change position and text of arrow 1
-                    self.text.setPos(m_x[0], 0)
-                    self.arrow.setPos(m_x[0], 0)
+                    self.text.setPos(m_x[0], self.control.set_quartz_frequency_offset.value())
+                    self.arrow.setPos(m_x[0], self.control.set_quartz_frequency_offset.value())
                     if m_x[0]>self.control.error_limits[0] and m_x[0]<self.control.error_limits[1]:
                         self.text.setText('[f={:0.3f} Hz]'.format(m_x[0]))
                         self.arrow.setStyle(brush=pg.mkBrush('b'))

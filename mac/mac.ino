@@ -43,6 +43,7 @@ int lock_step_cpt = 1;           // CR: Quartz lock step
 const int averages = 1;          // Number of averages before each laser lock step
 int init_VCSEL_current = 30000;  // Laser current word after initial startup ->44564 (1.7 mA)
 int quartz_init = 10000;   // Initial quartz dac word -1500 avec synthese j
+int quartz_offset = 0;
 float kp = 0.4;
 float ki = 0.01;
 float kd = 0;
@@ -358,13 +359,13 @@ void set_synth_CPT(){
 
 void TEC_on() {                                          // Turns LTC1923 on by pulling ~SDCYNC (pin 3) high
   digitalWrite(TEC_on_off,HIGH);
-  printDebug("TEC ON");
+  // printDebug("TEC ON");
 }
 
 
 void TEC_off() {                                         // Turns LTC1923 off by pulling ~SDCYNC (pin 3) low
   digitalWrite(TEC_on_off,LOW);
-  printDebug("TEC OFF");  
+  // printDebug("TEC OFF");  
 }
 
 
@@ -391,17 +392,16 @@ void VCSEL_startup(){                                    // VCSEL slow-start, sl
       DAC_load(CS_VCSEL, i);
       delay(2);
   }
-  printDebug("Startup terminated, VCSEL at I ~ 1,7 mA");
+  // printDebug("Startup terminated, VCSEL at I ~ 1,7 mA");
 }
 
 // case '2':
 void Show_CPT(){
-  ADF4158_Set_CPT_lock();
   DAC_load(CS_DAC_quartz, 0); //quartz_init
   VCSEL_startup();                                      // Ramp-up VCSEL current
   TEC_DAC_load(TEC_WORD);                               // Set VCSEL TEC Word
   TEC_on();
-  ADF4158_Set_CPT();
+  ADF4158_Set_CPT_lock();
   DAC_load(CS_mag, 0);                              // Sets magnetic field word to 0
 }
 
@@ -461,6 +461,7 @@ void setLaserLockParameters(){
 //case 'j':
 void setQuartzLockParameters(){
   quartz_init = Serial.parseFloat();
+  quartz_offset = Serial.parseFloat();
 }
 //case 't':
 void LaserScanSetStart(){
@@ -616,7 +617,7 @@ void ErrorDisplay(){
     toggle_Trigger();
     toggle_TXDATA();
     val2 = ADC_read();
-    Error = val1-val2; // -offset
+    Error = val1-val2-quartz_offset;
     ErrorSum += Error;
     ErrorDiff = Error - previousError;
     NewVal = (previous_quartz_val - (kp*Error + ki*ErrorSum + kd*ErrorDiff));

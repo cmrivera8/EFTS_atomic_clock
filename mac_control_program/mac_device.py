@@ -136,6 +136,7 @@ class Mac():
         self.end_quartz=misc.frequency_to_word(60000)
         # Sub-group 2: CPT lock
         self.quartz_lock_initial_value=misc.frequency_to_word(50000)
+        self.quartz_frequency_offset=0
         self.quartz_kp=0.4
         self.quartz_ki=0.01
         self.quartz_kd=0
@@ -226,7 +227,7 @@ class Mac():
         self.send(command)
 
     def update_quartz_parameters(self):
-        command = "j {}".format(int(self.quartz_lock_initial_value))
+        command = "j {} {}".format(int(self.quartz_lock_initial_value), int(self.quartz_frequency_offset))
         self.send(command)
 
     def update_quartz_scan_parameters(self):
