@@ -30,6 +30,14 @@ ADF4158-9_Setup_v4_10_6.zip
 #Schematics and PCB
 /Schematics and PCB/MAC ADC v1.0/__Previews
 
+# /Internship Project M1 (Carlos RIVERA)
+Internship Project M1 (Carlos RIVERA)/Code/adf4158.py
+Internship Project M1 (Carlos RIVERA)/Code/subcomponent.py
+Internship Project M1 (Carlos RIVERA)/Code/mac_device.py
+Internship Project M1 (Carlos RIVERA)/Code/mac.ino
+Internship Project M1 (Carlos RIVERA)/Code/misc.py
+Internship Project M1 (Carlos RIVERA)/Code/qt_mac
+
 #Update changes:
 #git rm -r --cached .
 #git add .
