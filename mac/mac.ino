@@ -417,6 +417,7 @@ int ADC_read(){                                          // Reads the ADC value,
   return val;
 }
 
+// Current ADC function
 void ADC_startup() {            // Starts ADS1118, FSR = 1.024 V
   SPI.setDataMode(SPI_MODE1);
   digitalWrite(CS_ADC, LOW);
@@ -426,6 +427,7 @@ void ADC_startup() {            // Starts ADS1118, FSR = 1.024 V
   SPI.setDataMode(SPI_MODE0);
 }
 
+// Proposed new ADC function
 // void ADC_startup() {            // Starts ADS1118, FSR = 4.096 V
 //   SPI.setDataMode(SPI_MODE1);
 //   digitalWrite(CS_ADC, LOW);
