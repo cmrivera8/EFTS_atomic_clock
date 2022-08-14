@@ -3,6 +3,10 @@ __pycache__
 *.asv
 *.~vsdx
 __Previews
+
+# Main /
+/Cell temp control Arduino files
+
 # /Documentation
 /Documentation/To-do list.txt
 /Documentation/MAC Demonstrator Documentation Rev. 1.0/MAC Demonstrator Documentation Rev. 1.0
@@ -21,6 +25,9 @@ ADF4158-9_Setup_v4_10_6.zip
 
 # /Matlab
 /Matlab/error_signal.m
+
+#Schematics and PCB
+/Schematics and PCB/MAC ADC v1.0/__Previews
 
 #Update changes:
 #git rm -r --cached .
