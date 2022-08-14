@@ -1,0 +1,6 @@
+Packages installed to run the software:
+
+python -m pip install pyserial
+pip install pyqtgraph
+pip install PyQt6
+pip install pyyaml

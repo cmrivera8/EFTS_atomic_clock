@@ -1,7 +1,27 @@
 *.pyc
+__pycache__
 *.asv
 *.~vsdx
+__Previews
 # /Documentation
 /Documentation/To-do list.txt
-/Documentation/MAC Demonstrator Documentation Rev. 1.0
+/Documentation/MAC Demonstrator Documentation Rev. 1.0/MAC Demonstrator Documentation Rev. 1.0
+Descriptif_programme_Arduino.odt
+ADF4158-9_Setup_v4_10_6.zip
 /Documentation/MAC Demonstrator Documentation Rev. 1.0.zip
+/Documentation/CSAD-Review-Kitching.pdf
+/Documentation/Doppler_free_spectroscopy_report_V4_md.pdf
+/Documentation/Q&A.txt
+/Schematics and PCB/Module Physique/PJ Demonstrateur MAC Rev. 1.1.zip
+*.b#*
+*.s#*
+
+# /Graphs
+/Graphs
+
+# /Matlab
+/Matlab/error_signal.m
+
+#Update changes:
+#git rm -r --cached .
+#git add .

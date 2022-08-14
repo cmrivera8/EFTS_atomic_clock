@@ -1,5 +1,5 @@
 {
     "board": "arduino:sam:arduino_due_x_dbg",
     "sketch": "mac\\mac.ino",
-    "port": "COM3"
+    "port": "COM7"
 }
