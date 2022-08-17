@@ -25,8 +25,13 @@ for i=1:size(ADC_word,2)
 end
 
 %% With new overflow correction
-ADC_word=[-16210,-13494,-10875,3399 ,17367]
-new_volt=[1.9650,2.0300,2.1450,2.545,2.985]
+%With ADC FSR = 1.024 V
+% ADC_word=[-16210,-13494,-10875,3399 ,17367]
+% new_volt=[1.9650,2.0300,2.1450,2.545,2.985]
+
+%With ADC FSR = 4.096 V
+ADC_word=[1900,    3500,   1100,   7200,   10500];
+new_volt=[2.72425, 2.9197, 2.6222, 3.3872, 3.7910];
 hold off
 
 scatter(ADC_word,new_volt,'LineWidth',1.5)
@@ -48,7 +53,8 @@ legend('Measured points','Linear fit','Location','southeast')
 ylabel('Photodiode voltage (V)') 
 xlabel('ADC measurement (machine units)') 
 grid on
-saveas(gcf,'output/word_to_voltage','epsc')
+% saveas(gcf,'output/word_to_voltage_fsr_1','epsc')
+saveas(gcf,'output/word_to_voltage_fsr_4','epsc')
 %% Fit of curve ADC reading vs DAC word
 clc
 
