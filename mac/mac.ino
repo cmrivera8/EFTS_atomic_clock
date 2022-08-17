@@ -418,24 +418,24 @@ int ADC_read(){                                          // Reads the ADC value,
 }
 
 // Current ADC function
-void ADC_startup() {            // Starts ADS1118, FSR = 1.024 V
-  SPI.setDataMode(SPI_MODE1);
-  digitalWrite(CS_ADC, LOW);
-  SPI.transfer(B00000110);      // CR: ADC FSR = 1.024V, since Ref is 2.5 V, 
-  SPI.transfer(B11100011);      // CR: the measurement range is from 1.4760 V to 3.5240 V
-  digitalWrite(CS_ADC, HIGH);   // CR: with a LSB size of 31.25 μV (LSB = FSR / 2^16).
-  SPI.setDataMode(SPI_MODE0);
-}
-
-// Proposed new ADC function
-// void ADC_startup() {            // Starts ADS1118, FSR = 4.096 V
+// void ADC_startup() {            // Starts ADS1118, FSR = 1.024 V
 //   SPI.setDataMode(SPI_MODE1);
 //   digitalWrite(CS_ADC, LOW);
-//   SPI.transfer(B00000010);      // CR: ADC FSR = 4.096V, since Ref is 2.5 V, 
-//   SPI.transfer(B11100011);      // CR: the measurement range is from -1.5960 V to 6.5960 V*
-//   digitalWrite(CS_ADC, HIGH);   // CR: with a LSB size of 125 μV (LSB = FSR / 2^16).
-//   SPI.setDataMode(SPI_MODE0);   // *Note: photodiode outputs never exceeds 5 V.
+//   SPI.transfer(B00000110);      // CR: ADC FSR = 1.024V, since Ref is 2.5 V, 
+//   SPI.transfer(B11100011);      // CR: the measurement range is from 1.4760 V to 3.5240 V
+//   digitalWrite(CS_ADC, HIGH);   // CR: with a LSB size of 31.25 μV (LSB = FSR / 2^16).
+//   SPI.setDataMode(SPI_MODE0);
 // }
+
+// Proposed new ADC function
+void ADC_startup() {            // Starts ADS1118, FSR = 4.096 V
+  SPI.setDataMode(SPI_MODE1);
+  digitalWrite(CS_ADC, LOW);
+  SPI.transfer(B00000010);      // CR: ADC FSR = 4.096V, since Ref is 2.5 V, 
+  SPI.transfer(B11100011);      // CR: the measurement range is from -1.5960 V to 6.5960 V*
+  digitalWrite(CS_ADC, HIGH);   // CR: with a LSB size of 125 μV (LSB = FSR / 2^16).
+  SPI.setDataMode(SPI_MODE0);   // *Note: photodiode outputs never exceeds 6 V.
+}
 
 // case 'a':
 void setPidParams(){

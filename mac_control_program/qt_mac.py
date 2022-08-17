@@ -1058,7 +1058,7 @@ class AbsorptionGraphWidget(pg.GraphicsLayoutWidget):
                 y = y[x_ind[::-1]]
                 # Modify received data
                 # Correction of overflow
-                thresh = 10000
+                thresh = 20000 #10000
                 overflow_index=[]
                 overflow_ranges=[]
                 try:
